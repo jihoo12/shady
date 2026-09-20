@@ -1,6 +1,6 @@
 # shady
 
-<img src="\Screenshot.png">
+![Screenshot](Screenshot.png)
 
 A minimal Wayland compositor based on the TinyWL example from wlroots 0.20.2.
 Supports xdg-shell windows, keyboard/pointer input, and interactive move/resize.
