@@ -1,5 +1,7 @@
 # shady
 
+<img src="\Screenshot.png">
+
 A minimal Wayland compositor based on the TinyWL example from wlroots 0.20.2.
 Supports xdg-shell windows, keyboard/pointer input, and interactive move/resize.
 Alt+Escape exits; Alt+F1 cycles windows (the host desktop may intercept these).
@@ -16,8 +18,10 @@ Windows stay on a flat desktop plane. You move the **camera** (default view is f
 | Input | Action |
 |-------|--------|
 | Right-button drag | Orbit camera |
-| Middle-button drag | Pan camera |
-| Scroll wheel | Zoom |
+| Alt + middle-button drag | Pan camera |
+| Alt + scroll wheel | Zoom |
+| Scroll wheel (no Alt) | Forwarded to the client |
+| Middle-click (no Alt) | Forwarded to the client (e.g. paste) |
 | Alt + arrows / WASD | Pan |
 | Alt + Q / E | Orbit yaw |
 | Alt + `=` / `-` | Zoom |

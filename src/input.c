@@ -390,12 +390,23 @@ void server_cursor_motion_absolute(
 	process_cursor_motion(server, event->time_msec);
 }
 
+static uint32_t seat_modifiers(struct shady_server *server) {
+	struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(server->seat);
+	if (!keyboard) {
+		return 0;
+	}
+	return wlr_keyboard_get_modifiers(keyboard);
+}
+
 void server_cursor_button(struct wl_listener *listener, void *data) {
 	struct shady_server *server =
 		wl_container_of(listener, server, cursor_button);
 	struct wlr_pointer_button_event *event = data;
+	uint32_t mods = seat_modifiers(server);
 
-	if (event->button == BTN_RIGHT || event->button == BTN_MIDDLE) {
+	/* Right-drag orbits. Alt+middle-drag pans (plain middle goes to clients). */
+	if (event->button == BTN_RIGHT
+			|| (event->button == BTN_MIDDLE && (mods & WLR_MODIFIER_ALT))) {
 		if (event->state == WL_POINTER_BUTTON_STATE_PRESSED) {
 			server->cursor_mode = (event->button == BTN_RIGHT)
 				? SHADY_CURSOR_CAMERA_ORBIT : SHADY_CURSOR_CAMERA_PAN;
@@ -411,6 +422,13 @@ void server_cursor_button(struct wl_listener *listener, void *data) {
 				|| server->cursor_mode == SHADY_CURSOR_CAMERA_PAN) {
 			reset_cursor_mode(server);
 		}
+		return;
+	}
+
+	if (event->button == BTN_MIDDLE
+			&& event->state == WL_POINTER_BUTTON_STATE_RELEASED
+			&& server->cursor_mode == SHADY_CURSOR_CAMERA_PAN) {
+		reset_cursor_mode(server);
 		return;
 	}
 
@@ -435,8 +453,9 @@ void server_cursor_axis(struct wl_listener *listener, void *data) {
 		wl_container_of(listener, server, cursor_axis);
 	struct wlr_pointer_axis_event *event = data;
 
-	/* Scroll zooms the camera (does not forward to clients while useful). */
-	if (event->orientation == WL_POINTER_AXIS_VERTICAL_SCROLL) {
+	/* Alt+scroll zooms the camera; plain scroll goes to the client. */
+	if ((seat_modifiers(server) & WLR_MODIFIER_ALT)
+			&& event->orientation == WL_POINTER_AXIS_VERTICAL_SCROLL) {
 		server->camera.distance += (float)(event->delta * 0.01);
 		clamp_camera(&server->camera);
 		shady_render_schedule_all_outputs(server);
