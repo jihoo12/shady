@@ -1,6 +1,5 @@
 #include "gl_pipeline.h"
 
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,7 +13,6 @@
 #define SHADY_SHADER_DIR "shaders"
 #endif
 
-/* Mild blue tint so custom GLSL is visibly different from stock compositing. */
 static const float WINDOW_TINT[4] = { 0.85f, 0.90f, 1.10f, 1.0f };
 
 static char *read_shader_file(const char *name) {
@@ -119,67 +117,6 @@ static bool make_egl_current(struct wlr_renderer *renderer) {
 	return true;
 }
 
-/*
- * Matrices match wlroots util/matrix.c (row-major floats + `pos * mat` in GLSL
- * with glUniformMatrix3fv(..., GL_FALSE, ...)). Projection uses the same
- * FLIPPED_180 convention as gles2 begin_gles2_buffer_pass.
- */
-static void projection_flipped_180(float mat[9], int width, int height) {
-	float x = 2.0f / (float)width;
-	float y = 2.0f / (float)height;
-	memset(mat, 0, sizeof(float) * 9);
-	mat[0] = x;
-	mat[4] = y;
-	mat[2] = -copysignf(1.0f, mat[0]);
-	mat[5] = -copysignf(1.0f, mat[4]);
-	mat[8] = 1.0f;
-}
-
-static void mat3_identity(float m[9]) {
-	static const float identity[9] = {
-		1.0f, 0.0f, 0.0f,
-		0.0f, 1.0f, 0.0f,
-		0.0f, 0.0f, 1.0f,
-	};
-	memcpy(m, identity, sizeof(identity));
-}
-
-static void mat3_multiply(float mat[9], const float a[9], const float b[9]) {
-	float product[9];
-
-	product[0] = a[0] * b[0] + a[1] * b[3] + a[2] * b[6];
-	product[1] = a[0] * b[1] + a[1] * b[4] + a[2] * b[7];
-	product[2] = a[0] * b[2] + a[1] * b[5] + a[2] * b[8];
-
-	product[3] = a[3] * b[0] + a[4] * b[3] + a[5] * b[6];
-	product[4] = a[3] * b[1] + a[4] * b[4] + a[5] * b[7];
-	product[5] = a[3] * b[2] + a[4] * b[5] + a[5] * b[8];
-
-	product[6] = a[6] * b[0] + a[7] * b[3] + a[8] * b[6];
-	product[7] = a[6] * b[1] + a[7] * b[4] + a[8] * b[7];
-	product[8] = a[6] * b[2] + a[7] * b[5] + a[8] * b[8];
-
-	memcpy(mat, product, sizeof(product));
-}
-
-static void mat3_translate(float m[9], float x, float y) {
-	float translate[9] = {
-		1.0f, 0.0f, x,
-		0.0f, 1.0f, y,
-		0.0f, 0.0f, 1.0f,
-	};
-	mat3_multiply(m, m, translate);
-}
-
-static void mat3_scale(float m[9], float x, float y) {
-	float scale[9] = {
-		x, 0.0f, 0.0f,
-		0.0f, y, 0.0f,
-		0.0f, 0.0f, 1.0f,
-	};
-	mat3_multiply(m, m, scale);
-}
-
 bool shady_gl_pipeline_init(struct shady_gl_pipeline *pipeline,
 		struct wlr_renderer *renderer) {
 	memset(pipeline, 0, sizeof(*pipeline));
@@ -213,16 +150,16 @@ bool shady_gl_pipeline_init(struct shady_gl_pipeline *pipeline,
 		return false;
 	}
 
-	pipeline->u_proj_2d = glGetUniformLocation(pipeline->prog_2d, "u_proj");
+	pipeline->u_mvp_2d = glGetUniformLocation(pipeline->prog_2d, "u_mvp");
 	pipeline->u_tex_2d = glGetUniformLocation(pipeline->prog_2d, "u_tex");
 	pipeline->u_tint_2d = glGetUniformLocation(pipeline->prog_2d, "u_tint");
 	pipeline->u_has_alpha_2d = glGetUniformLocation(pipeline->prog_2d, "u_has_alpha");
-	pipeline->u_proj_ext = glGetUniformLocation(pipeline->prog_ext, "u_proj");
+	pipeline->u_mvp_ext = glGetUniformLocation(pipeline->prog_ext, "u_mvp");
 	pipeline->u_tex_ext = glGetUniformLocation(pipeline->prog_ext, "u_tex");
 	pipeline->u_tint_ext = glGetUniformLocation(pipeline->prog_ext, "u_tint");
 	pipeline->u_has_alpha_ext = glGetUniformLocation(pipeline->prog_ext, "u_has_alpha");
 
-	wlr_log(WLR_INFO, "GLES2 window pipeline ready (shaders from %s)",
+	wlr_log(WLR_INFO, "GLES2 3D window pipeline ready (shaders from %s)",
 		SHADY_SHADER_DIR);
 	return true;
 }
@@ -239,29 +176,17 @@ void shady_gl_pipeline_fini(struct shady_gl_pipeline *pipeline) {
 }
 
 void shady_gl_pipeline_draw_window(struct shady_gl_pipeline *pipeline,
-		GLenum target, GLuint tex, bool has_alpha,
-		float x, float y, float width, float height,
-		int buffer_width, int buffer_height) {
+		GLenum target, GLuint tex, bool has_alpha, const float mvp[16]) {
 	bool external = (target == GL_TEXTURE_EXTERNAL_OES);
 	GLuint prog = external ? pipeline->prog_ext : pipeline->prog_2d;
-	GLint u_proj = external ? pipeline->u_proj_ext : pipeline->u_proj_2d;
+	GLint u_mvp = external ? pipeline->u_mvp_ext : pipeline->u_mvp_2d;
 	GLint u_tex = external ? pipeline->u_tex_ext : pipeline->u_tex_2d;
 	GLint u_tint = external ? pipeline->u_tint_ext : pipeline->u_tint_2d;
 	GLint u_has_alpha = external ? pipeline->u_has_alpha_ext
 		: pipeline->u_has_alpha_2d;
 
-	float proj[9];
-	projection_flipped_180(proj, buffer_width, buffer_height);
-
-	/* Same as wlroots set_proj_matrix: translate+scale the unit quad into place. */
-	float box[9];
-	mat3_identity(box);
-	mat3_translate(box, x, y);
-	mat3_scale(box, width, height);
-	mat3_multiply(box, proj, box);
-
 	glUseProgram(prog);
-	glUniformMatrix3fv(u_proj, 1, GL_FALSE, box);
+	glUniformMatrix4fv(u_mvp, 1, GL_FALSE, mvp);
 	glUniform4fv(u_tint, 1, WINDOW_TINT);
 	glUniform1f(u_has_alpha, has_alpha ? 1.0f : 0.0f);
 	glUniform1i(u_tex, 0);
@@ -276,23 +201,25 @@ void shady_gl_pipeline_draw_window(struct shady_gl_pipeline *pipeline,
 	if (has_alpha) {
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+		glDepthMask(GL_FALSE);
 	} else {
 		glDisable(GL_BLEND);
+		glDepthMask(GL_TRUE);
 	}
 
-	/* Client-side verts like wlroots (avoids leftover VBO/VAO state). */
 	static const GLfloat verts[] = {
-		0.f, 0.f,
-		1.f, 0.f,
-		0.f, 1.f,
-		1.f, 1.f,
+		0.f, 0.f, 0.f,
+		1.f, 0.f, 0.f,
+		0.f, 1.f, 0.f,
+		1.f, 1.f, 0.f,
 	};
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, verts);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, verts);
 	glEnableVertexAttribArray(0);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 	glDisableVertexAttribArray(0);
 
+	glDepthMask(GL_TRUE);
 	glBindTexture(target, 0);
 	glUseProgram(0);
 }

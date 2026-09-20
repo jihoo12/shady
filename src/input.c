@@ -1,4 +1,6 @@
 /* Adapted from wlroots 0.20.2 TinyWL (CC0). See LICENSES/tinywl-CC0.txt. */
+#include <linux/input-event-codes.h>
+#include <math.h>
 #include <stdlib.h>
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_cursor.h>
@@ -14,33 +16,37 @@
 #include <xkbcommon/xkbcommon.h>
 
 #include "shady.h"
+#include "render/math3d.h"
+#include "render/pick3d.h"
+#include "render/render.h"
+
+#define CAMERA_ORBIT_SENS 0.005f
+#define CAMERA_PAN_SENS 0.0025f
+#define CAMERA_KEY_PAN 0.05f
+#define CAMERA_KEY_ORBIT 0.08f
+#define CAMERA_ZOOM_STEP 0.15f
+#define CAMERA_PITCH_MAX 1.4f
+#define CAMERA_DIST_MIN 0.4f
+#define CAMERA_DIST_MAX 12.0f
 
 void reset_cursor_mode(struct shady_server *server) {
 	server->cursor_mode = SHADY_CURSOR_PASSTHROUGH;
 	server->grabbed_toplevel = NULL;
 }
 
-static struct shady_toplevel *desktop_toplevel_at(
-		struct shady_server *server, double lx, double ly,
-		struct wlr_surface **surface, double *sx, double *sy) {
-	struct wlr_scene_node *node = wlr_scene_node_at(
-		&server->scene->tree.node, lx, ly, sx, sy);
-	if (node == NULL || node->type != WLR_SCENE_NODE_BUFFER) {
-		return NULL;
+static void clamp_camera(struct shady_camera *cam) {
+	if (cam->pitch > CAMERA_PITCH_MAX) {
+		cam->pitch = CAMERA_PITCH_MAX;
 	}
-	struct wlr_scene_buffer *scene_buffer = wlr_scene_buffer_from_node(node);
-	struct wlr_scene_surface *scene_surface =
-		wlr_scene_surface_try_from_buffer(scene_buffer);
-	if (!scene_surface) {
-		return NULL;
+	if (cam->pitch < -CAMERA_PITCH_MAX) {
+		cam->pitch = -CAMERA_PITCH_MAX;
 	}
-
-	*surface = scene_surface->surface;
-	struct wlr_scene_tree *tree = node->parent;
-	while (tree != NULL && tree->node.data == NULL) {
-		tree = tree->node.parent;
+	if (cam->distance < CAMERA_DIST_MIN) {
+		cam->distance = CAMERA_DIST_MIN;
 	}
-	return tree->node.data;
+	if (cam->distance > CAMERA_DIST_MAX) {
+		cam->distance = CAMERA_DIST_MAX;
+	}
 }
 
 static void process_cursor_move(struct shady_server *server) {
@@ -91,6 +97,31 @@ static void process_cursor_resize(struct shady_server *server) {
 	wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, new_width, new_height);
 }
 
+static void process_cursor_camera_orbit(struct shady_server *server) {
+	double dx = server->cursor->x - server->cam_grab_x;
+	double dy = server->cursor->y - server->cam_grab_y;
+	server->camera.yaw = server->cam_grab_yaw - (float)dx * CAMERA_ORBIT_SENS;
+	server->camera.pitch = server->cam_grab_pitch - (float)dy * CAMERA_ORBIT_SENS;
+	clamp_camera(&server->camera);
+	shady_render_schedule_all_outputs(server);
+}
+
+static void process_cursor_camera_pan(struct shady_server *server) {
+	double dx = server->cursor->x - server->cam_grab_x;
+	double dy = server->cursor->y - server->cam_grab_y;
+	struct shady_vec3 right, up;
+	shady_camera_basis(&server->camera, &right, &up, NULL);
+	/* Drag right → pan world left (camera moves with grab). */
+	float scale = server->camera.distance * CAMERA_PAN_SENS;
+	server->camera.target_x = server->cam_grab_target_x
+		- right.x * (float)dx * scale + up.x * (float)dy * scale;
+	server->camera.target_y = server->cam_grab_target_y
+		- right.y * (float)dx * scale + up.y * (float)dy * scale;
+	server->camera.target_z = server->cam_grab_target_z
+		- right.z * (float)dx * scale + up.z * (float)dy * scale;
+	shady_render_schedule_all_outputs(server);
+}
+
 static void process_cursor_motion(struct shady_server *server, uint32_t time) {
 	if (server->cursor_mode == SHADY_CURSOR_MOVE) {
 		process_cursor_move(server);
@@ -98,12 +129,18 @@ static void process_cursor_motion(struct shady_server *server, uint32_t time) {
 	} else if (server->cursor_mode == SHADY_CURSOR_RESIZE) {
 		process_cursor_resize(server);
 		return;
+	} else if (server->cursor_mode == SHADY_CURSOR_CAMERA_ORBIT) {
+		process_cursor_camera_orbit(server);
+		return;
+	} else if (server->cursor_mode == SHADY_CURSOR_CAMERA_PAN) {
+		process_cursor_camera_pan(server);
+		return;
 	}
 
 	double sx, sy;
 	struct wlr_seat *seat = server->seat;
 	struct wlr_surface *surface = NULL;
-	struct shady_toplevel *toplevel = desktop_toplevel_at(server,
+	struct shady_toplevel *toplevel = shady_toplevel_at_3d(server,
 			server->cursor->x, server->cursor->y, &surface, &sx, &sy);
 	if (!toplevel) {
 		wlr_cursor_set_xcursor(server->cursor, server->cursor_mgr, "default");
@@ -127,6 +164,9 @@ static void keyboard_handle_modifiers(
 }
 
 static bool handle_keybinding(struct shady_server *server, xkb_keysym_t sym) {
+	bool camera_changed = false;
+	struct shady_vec3 right, up, forward;
+
 	switch (sym) {
 	case XKB_KEY_Escape:
 		wl_display_terminate(server->wl_display);
@@ -139,8 +179,72 @@ static bool handle_keybinding(struct shady_server *server, xkb_keysym_t sym) {
 			wl_container_of(server->toplevels.prev, next_toplevel, link);
 		focus_toplevel(next_toplevel);
 		break;
+	case XKB_KEY_Left:
+	case XKB_KEY_a:
+	case XKB_KEY_A:
+		shady_camera_basis(&server->camera, &right, &up, &forward);
+		server->camera.target_x -= right.x * CAMERA_KEY_PAN;
+		server->camera.target_y -= right.y * CAMERA_KEY_PAN;
+		server->camera.target_z -= right.z * CAMERA_KEY_PAN;
+		camera_changed = true;
+		break;
+	case XKB_KEY_Right:
+	case XKB_KEY_d:
+	case XKB_KEY_D:
+		shady_camera_basis(&server->camera, &right, &up, &forward);
+		server->camera.target_x += right.x * CAMERA_KEY_PAN;
+		server->camera.target_y += right.y * CAMERA_KEY_PAN;
+		server->camera.target_z += right.z * CAMERA_KEY_PAN;
+		camera_changed = true;
+		break;
+	case XKB_KEY_Up:
+	case XKB_KEY_w:
+	case XKB_KEY_W:
+		shady_camera_basis(&server->camera, &right, &up, &forward);
+		server->camera.target_x += up.x * CAMERA_KEY_PAN;
+		server->camera.target_y += up.y * CAMERA_KEY_PAN;
+		server->camera.target_z += up.z * CAMERA_KEY_PAN;
+		camera_changed = true;
+		break;
+	case XKB_KEY_Down:
+	case XKB_KEY_s:
+	case XKB_KEY_S:
+		shady_camera_basis(&server->camera, &right, &up, &forward);
+		server->camera.target_x -= up.x * CAMERA_KEY_PAN;
+		server->camera.target_y -= up.y * CAMERA_KEY_PAN;
+		server->camera.target_z -= up.z * CAMERA_KEY_PAN;
+		camera_changed = true;
+		break;
+	case XKB_KEY_q:
+	case XKB_KEY_Q:
+		server->camera.yaw += CAMERA_KEY_ORBIT;
+		camera_changed = true;
+		break;
+	case XKB_KEY_e:
+	case XKB_KEY_E:
+		server->camera.yaw -= CAMERA_KEY_ORBIT;
+		camera_changed = true;
+		break;
+	case XKB_KEY_equal:
+	case XKB_KEY_plus:
+		server->camera.distance -= CAMERA_ZOOM_STEP;
+		camera_changed = true;
+		break;
+	case XKB_KEY_minus:
+		server->camera.distance += CAMERA_ZOOM_STEP;
+		camera_changed = true;
+		break;
+	case XKB_KEY_0:
+		shady_camera_reset(&server->camera);
+		camera_changed = true;
+		break;
 	default:
 		return false;
+	}
+
+	if (camera_changed) {
+		clamp_camera(&server->camera);
+		shady_render_schedule_all_outputs(server);
 	}
 	return true;
 }
@@ -290,14 +394,37 @@ void server_cursor_button(struct wl_listener *listener, void *data) {
 	struct shady_server *server =
 		wl_container_of(listener, server, cursor_button);
 	struct wlr_pointer_button_event *event = data;
+
+	if (event->button == BTN_RIGHT || event->button == BTN_MIDDLE) {
+		if (event->state == WL_POINTER_BUTTON_STATE_PRESSED) {
+			server->cursor_mode = (event->button == BTN_RIGHT)
+				? SHADY_CURSOR_CAMERA_ORBIT : SHADY_CURSOR_CAMERA_PAN;
+			server->cam_grab_x = server->cursor->x;
+			server->cam_grab_y = server->cursor->y;
+			server->cam_grab_yaw = server->camera.yaw;
+			server->cam_grab_pitch = server->camera.pitch;
+			server->cam_grab_target_x = server->camera.target_x;
+			server->cam_grab_target_y = server->camera.target_y;
+			server->cam_grab_target_z = server->camera.target_z;
+			wlr_seat_pointer_clear_focus(server->seat);
+		} else if (server->cursor_mode == SHADY_CURSOR_CAMERA_ORBIT
+				|| server->cursor_mode == SHADY_CURSOR_CAMERA_PAN) {
+			reset_cursor_mode(server);
+		}
+		return;
+	}
+
 	wlr_seat_pointer_notify_button(server->seat,
 			event->time_msec, event->button, event->state);
 	if (event->state == WL_POINTER_BUTTON_STATE_RELEASED) {
-		reset_cursor_mode(server);
+		if (server->cursor_mode != SHADY_CURSOR_CAMERA_ORBIT
+				&& server->cursor_mode != SHADY_CURSOR_CAMERA_PAN) {
+			reset_cursor_mode(server);
+		}
 	} else {
 		double sx, sy;
 		struct wlr_surface *surface = NULL;
-		struct shady_toplevel *toplevel = desktop_toplevel_at(server,
+		struct shady_toplevel *toplevel = shady_toplevel_at_3d(server,
 				server->cursor->x, server->cursor->y, &surface, &sx, &sy);
 		focus_toplevel(toplevel);
 	}
@@ -307,6 +434,15 @@ void server_cursor_axis(struct wl_listener *listener, void *data) {
 	struct shady_server *server =
 		wl_container_of(listener, server, cursor_axis);
 	struct wlr_pointer_axis_event *event = data;
+
+	/* Scroll zooms the camera (does not forward to clients while useful). */
+	if (event->orientation == WL_POINTER_AXIS_VERTICAL_SCROLL) {
+		server->camera.distance += (float)(event->delta * 0.01);
+		clamp_camera(&server->camera);
+		shady_render_schedule_all_outputs(server);
+		return;
+	}
+
 	wlr_seat_pointer_notify_axis(server->seat,
 			event->time_msec, event->orientation, event->delta,
 			event->delta_discrete, event->source, event->relative_direction);

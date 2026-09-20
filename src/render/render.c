@@ -15,20 +15,60 @@
 
 #include "../shady.h"
 #include "gl_pipeline.h"
+#include "math3d.h"
 
 static struct shady_gl_pipeline pipeline;
 static bool pipeline_ready;
+static GLuint depth_rbo;
+static int depth_rbo_w, depth_rbo_h;
 
 bool shady_render_init(struct wlr_renderer *renderer) {
 	pipeline_ready = shady_gl_pipeline_init(&pipeline, renderer);
+	depth_rbo = 0;
+	depth_rbo_w = depth_rbo_h = 0;
 	return pipeline_ready;
 }
 
 void shady_render_fini(void) {
+	if (depth_rbo) {
+		glDeleteRenderbuffers(1, &depth_rbo);
+		depth_rbo = 0;
+	}
 	if (pipeline_ready) {
 		shady_gl_pipeline_fini(&pipeline);
 		pipeline_ready = false;
 	}
+}
+
+void shady_render_camera_matrices(struct shady_server *server,
+		int buf_w, int buf_h, float view[16], float proj[16]) {
+	shady_camera_view(&server->camera, view);
+	float aspect = (buf_h > 0) ? ((float)buf_w / (float)buf_h) : 1.f;
+	shady_mat4_perspective(proj, SHADY_CAMERA_FOV_Y, aspect,
+		SHADY_CAMERA_NEAR, SHADY_CAMERA_FAR);
+}
+
+void shady_render_schedule_all_outputs(struct shady_server *server) {
+	struct shady_output *output;
+	wl_list_for_each(output, &server->outputs, link) {
+		wlr_output_schedule_frame(output->wlr_output);
+	}
+}
+
+static void ensure_depth_rbo(int w, int h) {
+	if (depth_rbo && depth_rbo_w == w && depth_rbo_h == h) {
+		return;
+	}
+	if (depth_rbo) {
+		glDeleteRenderbuffers(1, &depth_rbo);
+		depth_rbo = 0;
+	}
+	glGenRenderbuffers(1, &depth_rbo);
+	glBindRenderbuffer(GL_RENDERBUFFER, depth_rbo);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, w, h);
+	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	depth_rbo_w = w;
+	depth_rbo_h = h;
 }
 
 static void send_frame_done_surface(struct wlr_surface *surface,
@@ -62,22 +102,36 @@ void shady_render_output_frame(struct shady_output *output) {
 		return;
 	}
 
-	/* Buffer pixel size (matches wlroots begin_gles2_buffer_pass viewport). */
 	int buf_w = wlr_output->width;
 	int buf_h = wlr_output->height;
 	float scale = wlr_output->scale;
+	float logical_w = (float)buf_w / scale;
+	float logical_h = (float)buf_h / scale;
+
+	/* Attach a depth RBO to wlroots' color-only FBO for 3D occlusion. */
+	GLint fbo = 0;
+	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &fbo);
+	ensure_depth_rbo(buf_w, buf_h);
+	glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)fbo);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+		GL_RENDERBUFFER, depth_rbo);
 
 	glViewport(0, 0, buf_w, buf_h);
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LEQUAL);
 	glClearColor(0.12f, 0.12f, 0.14f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT);
-	glDisable(GL_DEPTH_TEST);
+	glClearDepthf(1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_SCISSOR_TEST);
+
+	float view[16], proj[16], vp[16];
+	shady_render_camera_matrices(server, buf_w, buf_h, view, proj);
+	shady_mat4_multiply(vp, proj, view);
 
 	double ox = 0, oy = 0;
 	wlr_output_layout_output_coords(server->output_layout, wlr_output, &ox, &oy);
 
-	/* Bottom-to-top so the focused (list head) window is drawn last. */
 	struct shady_toplevel *toplevel;
 	wl_list_for_each_reverse(toplevel, &server->toplevels, link) {
 		struct wlr_surface *surface = toplevel->xdg_toplevel->base->surface;
@@ -93,19 +147,28 @@ void shady_render_output_frame(struct shady_output *output) {
 		struct wlr_gles2_texture_attribs attribs;
 		wlr_gles2_texture_get_attribs(texture, &attribs);
 
-		/* Layout coords → buffer pixels (wlroots render-pass space). */
-		float x = (float)((toplevel->scene_tree->node.x + ox) * scale);
-		float y = (float)((toplevel->scene_tree->node.y + oy) * scale);
-		float tw = (float)surface->current.width * scale;
-		float th = (float)surface->current.height * scale;
+		float tw = (float)surface->current.width;
+		float th = (float)surface->current.height;
 		if (tw <= 0.f || th <= 0.f) {
-			tw = (float)texture->width;
-			th = (float)texture->height;
+			tw = (float)texture->width / scale;
+			th = (float)texture->height / scale;
 		}
 
+		float layout_x = (float)(toplevel->scene_tree->node.x + ox);
+		float layout_y = (float)(toplevel->scene_tree->node.y + oy);
+
+		float model[16], mvp[16];
+		shady_window_model(model, layout_x, layout_y, tw, th,
+			logical_w, logical_h);
+		shady_mat4_multiply(mvp, vp, model);
+
 		shady_gl_pipeline_draw_window(&pipeline, attribs.target, attribs.tex,
-			attribs.has_alpha, x, y, tw, th, buf_w, buf_h);
+			attribs.has_alpha, mvp);
 	}
+
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+		GL_RENDERBUFFER, 0);
+	glDisable(GL_DEPTH_TEST);
 
 	if (!wlr_render_pass_submit(pass)) {
 		wlr_log(WLR_ERROR, "failed to submit render pass");
@@ -113,11 +176,6 @@ void shady_render_output_frame(struct shady_output *output) {
 	wlr_output_commit_state(wlr_output, &state);
 	wlr_output_state_finish(&state);
 
-	/*
-	 * Do not rely on wlr_scene_output_send_frame_done alone: without a scene
-	 * commit, visibility / pacing can skip callbacks and clients (e.g. foot)
-	 * never redraw past an empty/black buffer.
-	 */
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	wl_list_for_each(toplevel, &server->toplevels, link) {

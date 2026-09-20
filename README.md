@@ -5,10 +5,25 @@ Supports xdg-shell windows, keyboard/pointer input, and interactive move/resize.
 Alt+Escape exits; Alt+F1 cycles windows (the host desktop may intercept these).
 The imported example is CC0; see [its license](LICENSES/tinywl-CC0.txt).
 
-Windows are drawn with a custom GLES2 pipeline and editable GLSL under
-`shaders/` (`window.vert`, `window.frag`, `window_ext.frag`). Compositor logic
-lives in `src/`; the GL path is isolated in `src/render/`. A mild tint uniform
-makes the custom path visibly different from stock wlroots compositing.
+Windows are drawn with a custom GLES2 **3D** pipeline (textured quads +
+orbit camera). Editable GLSL lives under `shaders/`; GL code is in
+`src/render/`. A mild tint keeps the custom path visible.
+
+### 3D camera controls
+
+Windows stay on a flat desktop plane. You move the **camera** (default view is frontal / 2D-like).
+
+| Input | Action |
+|-------|--------|
+| Right-button drag | Orbit camera |
+| Middle-button drag | Pan camera |
+| Scroll wheel | Zoom |
+| Alt + arrows / WASD | Pan |
+| Alt + Q / E | Orbit yaw |
+| Alt + `=` / `-` | Zoom |
+| Alt + `0` | Reset to frontal 2D view |
+
+Pointer clicks are raycast onto the window surfaces.
 
 ## NixOS development
 

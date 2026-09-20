@@ -113,6 +113,7 @@ int main(int argc, char *argv[]) {
 	server.cursor_mgr = wlr_xcursor_manager_create(NULL, 24);
 
 	server.cursor_mode = SHADY_CURSOR_PASSTHROUGH;
+	shady_camera_reset(&server.camera);
 	server.cursor_motion.notify = server_cursor_motion;
 	wl_signal_add(&server.cursor->events.motion, &server.cursor_motion);
 	server.cursor_motion_absolute.notify = server_cursor_motion_absolute;

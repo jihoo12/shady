@@ -8,6 +8,8 @@
 #include <wlr/util/box.h>
 #include <xkbcommon/xkbcommon.h>
 
+#include "render/math3d.h"
+
 struct wlr_allocator;
 struct wlr_backend;
 struct wlr_cursor;
@@ -27,6 +29,8 @@ enum shady_cursor_mode {
 	SHADY_CURSOR_PASSTHROUGH,
 	SHADY_CURSOR_MOVE,
 	SHADY_CURSOR_RESIZE,
+	SHADY_CURSOR_CAMERA_ORBIT,
+	SHADY_CURSOR_CAMERA_PAN,
 };
 
 struct shady_toplevel;
@@ -67,6 +71,11 @@ struct shady_server {
 	struct wlr_output_layout *output_layout;
 	struct wl_list outputs;
 	struct wl_listener new_output;
+
+	struct shady_camera camera;
+	double cam_grab_x, cam_grab_y;
+	float cam_grab_yaw, cam_grab_pitch;
+	float cam_grab_target_x, cam_grab_target_y, cam_grab_target_z;
 };
 
 struct shady_output {
