@@ -5,6 +5,11 @@ Supports xdg-shell windows, keyboard/pointer input, and interactive move/resize.
 Alt+Escape exits; Alt+F1 cycles windows (the host desktop may intercept these).
 The imported example is CC0; see [its license](LICENSES/tinywl-CC0.txt).
 
+Windows are drawn with a custom GLES2 pipeline and editable GLSL under
+`shaders/` (`window.vert`, `window.frag`, `window_ext.frag`). Compositor logic
+lives in `src/`; the GL path is isolated in `src/render/`. A mild tint uniform
+makes the custom path visibly different from stock wlroots compositing.
+
 ## NixOS development
 
 Enable Nix flakes (`nix-command` and `flakes`) in your Nix configuration.
@@ -40,6 +45,10 @@ No global `/usr/include` or `/usr/lib` installation is needed.
    WLR_BACKENDS=wayland ./build/shady
    ```
 
+   Custom shaders require the **GLES2** renderer. Do not set
+   `WLR_RENDERER=pixman` (Shady will refuse to start). Nested testing needs a
+   working GPU path under the host Wayland session.
+
    `./build/shady` also automatically selects a Wayland backend when the host
    Wayland environment is present. Preserve the host `WAYLAND_DISPLAY` and
    `XDG_RUNTIME_DIR`: the backend needs them to connect to the host. The dev
@@ -69,11 +78,8 @@ No global `/usr/include` or `/usr/lib` installation is needed.
    Only the startup child receives Shady's display name; the compositor keeps
    the host environment. Stop Shady with Ctrl+C in its launching terminal.
 
-If GPU rendering fails during nested testing, try the software renderer:
-
-```sh
-WLR_BACKENDS=wayland WLR_RENDERER=pixman ./build/shady
-```
+After editing GLSL under `shaders/`, restart Shady (shaders are loaded at
+startup from the source-tree path baked in at configure time).
 
 Meson resolves headers and libraries through pkg-config from the shell. To
 check the full wlroots pkg-config dependency closure:
