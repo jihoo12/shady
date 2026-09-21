@@ -100,6 +100,16 @@ struct shady_toplevel {
 	struct wl_listener request_resize;
 	struct wl_listener request_maximize;
 	struct wl_listener request_fullscreen;
+	float wobble_x;
+	float wobble_y;
+
+	float wobble_vx;
+	float wobble_vy;
+
+	double last_move_x;
+	double last_move_y;
+
+	bool wobble_dragging;
 };
 
 struct shady_popup {

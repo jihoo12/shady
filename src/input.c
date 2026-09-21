@@ -50,10 +50,88 @@ static void clamp_camera(struct shady_camera *cam) {
 }
 
 static void process_cursor_move(struct shady_server *server) {
-	struct shady_toplevel *toplevel = server->grabbed_toplevel;
-	wlr_scene_node_set_position(&toplevel->scene_tree->node,
-		server->cursor->x - server->grab_x,
-		server->cursor->y - server->grab_y);
+	struct shady_toplevel *toplevel =
+		server->grabbed_toplevel;
+
+	if (!toplevel) {
+		return;
+	}
+
+	double new_x =
+		server->cursor->x -
+		server->grab_x;
+
+	double new_y =
+		server->cursor->y -
+		server->grab_y;
+
+	/*
+	 * Window displacement since the previous pointer event.
+	 *
+	 * A fast mouse movement therefore injects a larger impulse into
+	 * the wobble spring.
+	 */
+	double dx =
+		new_x -
+		toplevel->last_move_x;
+
+	double dy =
+		new_y -
+		toplevel->last_move_y;
+
+	if (!toplevel->wobble_dragging) {
+		toplevel->last_move_x = new_x;
+		toplevel->last_move_y = new_y;
+		toplevel->wobble_dragging = true;
+
+		dx = 0.0;
+		dy = 0.0;
+	}
+
+	/*
+	 * Add an impulse opposite to the direction of travel.
+	 *
+	 * This creates the feeling that the window's body has mass and
+	 * lags behind the mouse.
+	 */
+	toplevel->wobble_vx -=
+		(float)dx * 0.0065f;
+
+	toplevel->wobble_vy -=
+		(float)dy * 0.0065f;
+
+	/*
+	 * Prevent ridiculous deformation if the pointer jumps a large
+	 * distance in a single event.
+	 */
+	if (toplevel->wobble_vx > 0.45f) {
+		toplevel->wobble_vx = 0.45f;
+	}
+
+	if (toplevel->wobble_vx < -0.45f) {
+		toplevel->wobble_vx = -0.45f;
+	}
+
+	if (toplevel->wobble_vy > 0.45f) {
+		toplevel->wobble_vy = 0.45f;
+	}
+
+	if (toplevel->wobble_vy < -0.45f) {
+		toplevel->wobble_vy = -0.45f;
+	}
+
+	toplevel->last_move_x = new_x;
+	toplevel->last_move_y = new_y;
+
+	wlr_scene_node_set_position(
+		&toplevel->scene_tree->node,
+		(int)new_x,
+		(int)new_y
+	);
+
+	shady_render_schedule_all_outputs(
+		server
+	);
 }
 
 static void process_cursor_resize(struct shady_server *server) {

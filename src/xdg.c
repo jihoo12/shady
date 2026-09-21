@@ -48,8 +48,24 @@ static void begin_interactive(struct shady_toplevel *toplevel,
 	server->cursor_mode = mode;
 
 	if (mode == SHADY_CURSOR_MOVE) {
-		server->grab_x = server->cursor->x - toplevel->scene_tree->node.x;
-		server->grab_y = server->cursor->y - toplevel->scene_tree->node.y;
+		server->grab_x =
+			server->cursor->x -
+			toplevel->scene_tree->node.x;
+
+		server->grab_y =
+			server->cursor->y -
+			toplevel->scene_tree->node.y;
+
+		/*
+		* Initialise the wobble drag tracker.
+		*/
+		toplevel->last_move_x =
+			toplevel->scene_tree->node.x;
+
+		toplevel->last_move_y =
+			toplevel->scene_tree->node.y;
+
+		toplevel->wobble_dragging = true;
 	} else {
 		struct wlr_box *geo_box = &toplevel->xdg_toplevel->base->geometry;
 

@@ -1,6 +1,7 @@
 #include "render.h"
 
 #include <time.h>
+#include <math.h>
 
 #include <wayland-server-core.h>
 
@@ -33,6 +34,7 @@ static int depth_rbo_h;
  * Monotonic starting point for shader animation.
  */
 static struct timespec shader_start_time;
+static struct timespec wobble_last_time;
 
 static float shader_time_seconds(void) {
 	struct timespec now;
@@ -59,6 +61,120 @@ static float shader_time_seconds(void) {
 	);
 }
 
+static void update_wobbly_windows(
+	struct shady_server *server
+) {
+	struct timespec now;
+
+	clock_gettime(
+		CLOCK_MONOTONIC,
+		&now
+	);
+
+	float dt =
+		(float)(
+			now.tv_sec -
+			wobble_last_time.tv_sec
+		) +
+		(float)(
+			now.tv_nsec -
+			wobble_last_time.tv_nsec
+		) / 1000000000.0f;
+
+	wobble_last_time = now;
+
+	/*
+	 * Avoid giant simulation steps after debugging, suspend,
+	 * resizing the nested compositor, etc.
+	 */
+	if (dt <= 0.0f) {
+		return;
+	}
+
+	if (dt > 0.033f) {
+		dt = 0.033f;
+	}
+
+	/*
+	 * Spring constants.
+	 *
+	 * Larger SPRING = snaps back faster.
+	 * Larger DAMPING = loses energy faster.
+	 */
+	const float SPRING = 42.0f;
+	const float DAMPING = 7.5f;
+
+	struct shady_toplevel *toplevel;
+
+	wl_list_for_each(
+		toplevel,
+		&server->toplevels,
+		link
+	) {
+		/*
+		 * F = -kx
+		 */
+		float ax =
+			-toplevel->wobble_x *
+			SPRING;
+
+		float ay =
+			-toplevel->wobble_y *
+			SPRING;
+
+		toplevel->wobble_vx +=
+			ax * dt;
+
+		toplevel->wobble_vy +=
+			ay * dt;
+
+		/*
+		 * Exponential-ish damping.
+		 */
+		float damping =
+			1.0f -
+			DAMPING * dt;
+
+		if (damping < 0.0f) {
+			damping = 0.0f;
+		}
+
+		toplevel->wobble_vx *=
+			damping;
+
+		toplevel->wobble_vy *=
+			damping;
+
+		toplevel->wobble_x +=
+			toplevel->wobble_vx *
+			dt;
+
+		toplevel->wobble_y +=
+			toplevel->wobble_vy *
+			dt;
+
+		/*
+		 * Stop microscopic movement once the spring is effectively
+		 * at rest.
+		 */
+		if (
+			fabsf(toplevel->wobble_x) < 0.00005f &&
+			fabsf(toplevel->wobble_vx) < 0.00005f
+		) {
+			toplevel->wobble_x = 0.0f;
+			toplevel->wobble_vx = 0.0f;
+		}
+
+		if (
+			fabsf(toplevel->wobble_y) < 0.00005f &&
+			fabsf(toplevel->wobble_vy) < 0.00005f
+		) {
+			toplevel->wobble_y = 0.0f;
+			toplevel->wobble_vy = 0.0f;
+		}
+	}
+}
+
 bool shady_render_init(
 	struct wlr_renderer *renderer
 ) {
@@ -76,6 +192,9 @@ bool shady_render_init(
 		CLOCK_MONOTONIC,
 		&shader_start_time
 	);
+
+	wobble_last_time =
+		shader_start_time;
 
 	return pipeline_ready;
 }
@@ -356,6 +475,10 @@ void shady_render_output_frame(
 	float time_seconds =
 		shader_time_seconds();
 
+	update_wobbly_windows(
+		server
+	);
+
 	struct shady_toplevel *toplevel;
 
 	wl_list_for_each_reverse(
@@ -451,7 +574,9 @@ void shady_render_output_frame(
 			attribs.tex,
 			attribs.has_alpha,
 			mvp,
-			time_seconds
+			time_seconds,
+			toplevel->wobble_x,
+			toplevel->wobble_y
 		);
 	}
 

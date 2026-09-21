@@ -15,12 +15,20 @@ struct shady_gl_pipeline {
 	GLint u_tint_2d;
 	GLint u_has_alpha_2d;
 	GLint u_time_2d;
+	GLint u_wobble_2d;
 
 	GLint u_mvp_ext;
 	GLint u_tex_ext;
 	GLint u_tint_ext;
 	GLint u_has_alpha_ext;
 	GLint u_time_ext;
+	GLint u_wobble_ext;
+
+	/*
+	 * Subdivided window mesh.
+	 */
+	GLuint mesh_vbo;
+	GLsizei mesh_vertex_count;
 };
 
 bool shady_gl_pipeline_init(
@@ -32,18 +40,15 @@ void shady_gl_pipeline_fini(
 	struct shady_gl_pipeline *pipeline
 );
 
-/*
- * Draw a unit quad at z=0 using a column-major MVP.
- *
- * time_seconds is used by animated fragment shader effects.
- */
 void shady_gl_pipeline_draw_window(
 	struct shady_gl_pipeline *pipeline,
 	GLenum target,
 	GLuint tex,
 	bool has_alpha,
 	const float mvp[16],
-	float time_seconds
+	float time_seconds,
+	float wobble_x,
+	float wobble_y
 );
 
 #endif

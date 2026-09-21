@@ -22,6 +22,9 @@ static const float WINDOW_TINT[4] = {
 	1.0f
 };
 
+#define WOBBLE_MESH_X 16
+#define WOBBLE_MESH_Y 16
+
 static char *read_shader_file(const char *name) {
 	char path[512];
 
@@ -250,6 +253,116 @@ static bool make_egl_current(
 	return true;
 }
 
+static bool create_window_mesh(
+	struct shady_gl_pipeline *pipeline
+) {
+	/*
+	 * Two triangles per grid cell.
+	 *
+	 * 16 x 16 cells =
+	 * 512 triangles =
+	 * 1536 vertices.
+	 *
+	 * Tiny for a GPU, but enough subdivisions for a smooth wobble.
+	 */
+	const int cells =
+		WOBBLE_MESH_X *
+		WOBBLE_MESH_Y;
+
+	const int vertex_count =
+		cells * 6;
+
+	const int floats_per_vertex = 3;
+
+	GLfloat *vertices = calloc(
+		(size_t)vertex_count *
+		floats_per_vertex,
+		sizeof(GLfloat)
+	);
+
+	if (!vertices) {
+		return false;
+	}
+
+	int index = 0;
+
+	for (int y = 0; y < WOBBLE_MESH_Y; ++y) {
+		float y0 =
+			(float)y /
+			(float)WOBBLE_MESH_Y;
+
+		float y1 =
+			(float)(y + 1) /
+			(float)WOBBLE_MESH_Y;
+
+		for (int x = 0; x < WOBBLE_MESH_X; ++x) {
+			float x0 =
+				(float)x /
+				(float)WOBBLE_MESH_X;
+
+			float x1 =
+				(float)(x + 1) /
+				(float)WOBBLE_MESH_X;
+
+#define PUSH_VERTEX(px, py) \
+			do { \
+				vertices[index++] = (px); \
+				vertices[index++] = (py); \
+				vertices[index++] = 0.0f; \
+			} while (0)
+
+			/*
+			 * Triangle 1
+			 */
+			PUSH_VERTEX(x0, y0);
+			PUSH_VERTEX(x1, y0);
+			PUSH_VERTEX(x0, y1);
+
+			/*
+			 * Triangle 2
+			 */
+			PUSH_VERTEX(x0, y1);
+			PUSH_VERTEX(x1, y0);
+			PUSH_VERTEX(x1, y1);
+
+#undef PUSH_VERTEX
+		}
+	}
+
+	glGenBuffers(
+		1,
+		&pipeline->mesh_vbo
+	);
+
+	glBindBuffer(
+		GL_ARRAY_BUFFER,
+		pipeline->mesh_vbo
+	);
+
+	glBufferData(
+		GL_ARRAY_BUFFER,
+		(GLsizeiptr)(
+			vertex_count *
+			floats_per_vertex *
+			sizeof(GLfloat)
+		),
+		vertices,
+		GL_STATIC_DRAW
+	);
+
+	glBindBuffer(
+		GL_ARRAY_BUFFER,
+		0
+	);
+
+	free(vertices);
+
+	pipeline->mesh_vertex_count =
+		(GLsizei)vertex_count;
+
+	return pipeline->mesh_vbo != 0;
+}
+
 bool shady_gl_pipeline_init(
 	struct shady_gl_pipeline *pipeline,
 	struct wlr_renderer *renderer
@@ -346,6 +459,11 @@ bool shady_gl_pipeline_init(
 			pipeline->prog_2d,
 			"u_time"
 		);
+	pipeline->u_wobble_2d =
+		glGetUniformLocation(
+			pipeline->prog_2d,
+			"u_wobble"
+		);
 
 	/*
 	 * EGL external texture uniforms.
@@ -379,6 +497,12 @@ bool shady_gl_pipeline_init(
 			pipeline->prog_ext,
 			"u_time"
 		);
+	
+	pipeline->u_wobble_ext =
+		glGetUniformLocation(
+			pipeline->prog_ext,
+			"u_wobble"
+		);
 
 	wlr_log(
 		WLR_INFO,
@@ -387,12 +511,34 @@ bool shady_gl_pipeline_init(
 		SHADY_SHADER_DIR
 	);
 
+	if (!create_window_mesh(pipeline)) {
+		wlr_log(
+			WLR_ERROR,
+			"failed to create wobbly window mesh"
+		);
+
+		shady_gl_pipeline_fini(
+			pipeline
+		);
+
+		return false;
+	}
+
 	return true;
 }
 
 void shady_gl_pipeline_fini(
 	struct shady_gl_pipeline *pipeline
 ) {
+	if (pipeline->mesh_vbo) {
+		glDeleteBuffers(
+			1,
+			&pipeline->mesh_vbo
+		);
+
+		pipeline->mesh_vbo = 0;
+		pipeline->mesh_vertex_count = 0;
+	}
 	if (pipeline->prog_2d) {
 		glDeleteProgram(
 			pipeline->prog_2d
@@ -416,7 +562,9 @@ void shady_gl_pipeline_draw_window(
 	GLuint tex,
 	bool has_alpha,
 	const float mvp[16],
-	float time_seconds
+	float time_seconds,
+	float wobble_x,
+	float wobble_y
 ) {
 	bool external =
 		(target == GL_TEXTURE_EXTERNAL_OES);
@@ -451,6 +599,11 @@ void shady_gl_pipeline_draw_window(
 			? pipeline->u_time_ext
 			: pipeline->u_time_2d;
 
+	GLint u_wobble =
+		external
+			? pipeline->u_wobble_ext
+			: pipeline->u_wobble_2d;
+
 	glUseProgram(prog);
 
 	glUniformMatrix4fv(
@@ -476,12 +629,20 @@ void shady_gl_pipeline_draw_window(
 		time_seconds
 	);
 
+	glUniform2f(
+		u_wobble,
+		wobble_x,
+		wobble_y
+	);
+
 	glUniform1i(
 		u_tex,
 		0
 	);
 
-	glActiveTexture(GL_TEXTURE0);
+	glActiveTexture(
+		GL_TEXTURE0
+	);
 
 	glBindTexture(
 		target,
@@ -526,16 +687,12 @@ void shady_gl_pipeline_draw_window(
 		glDepthMask(GL_TRUE);
 	}
 
-	static const GLfloat verts[] = {
-		0.f, 0.f, 0.f,
-		1.f, 0.f, 0.f,
-		0.f, 1.f, 0.f,
-		1.f, 1.f, 0.f,
-	};
-
+	/*
+	 * Render the subdivided mesh instead of the old four-vertex quad.
+	 */
 	glBindBuffer(
 		GL_ARRAY_BUFFER,
-		0
+		pipeline->mesh_vbo
 	);
 
 	glVertexAttribPointer(
@@ -543,19 +700,24 @@ void shady_gl_pipeline_draw_window(
 		3,
 		GL_FLOAT,
 		GL_FALSE,
-		0,
-		verts
+		3 * sizeof(GLfloat),
+		(void *)0
 	);
 
 	glEnableVertexAttribArray(0);
 
 	glDrawArrays(
-		GL_TRIANGLE_STRIP,
+		GL_TRIANGLES,
 		0,
-		4
+		pipeline->mesh_vertex_count
 	);
 
 	glDisableVertexAttribArray(0);
+
+	glBindBuffer(
+		GL_ARRAY_BUFFER,
+		0
+	);
 
 	glDepthMask(GL_TRUE);
 
@@ -566,3 +728,4 @@ void shady_gl_pipeline_draw_window(
 
 	glUseProgram(0);
 }
+
