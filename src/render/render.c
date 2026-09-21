@@ -36,6 +36,14 @@ static int depth_rbo_h;
 static struct timespec shader_start_time;
 static struct timespec wobble_last_time;
 
+/*
+ * Total close animation duration.
+ *
+ * 0.42 seconds feels quick enough for a window manager while still
+ * making the effect clearly visible.
+ */
+#define CLOSE_ANIMATION_SECONDS 0.42f
+
 static float shader_time_seconds(void) {
 	struct timespec now;
 
@@ -61,7 +69,7 @@ static float shader_time_seconds(void) {
 	);
 }
 
-static void update_wobbly_windows(
+static void update_window_animations(
 	struct shady_server *server
 ) {
 	struct timespec now;
@@ -81,12 +89,9 @@ static void update_wobbly_windows(
 			wobble_last_time.tv_nsec
 		) / 1000000000.0f;
 
-	wobble_last_time = now;
+	wobble_last_time =
+		now;
 
-	/*
-	 * Avoid giant simulation steps after debugging, suspend,
-	 * resizing the nested compositor, etc.
-	 */
 	if (dt <= 0.0f) {
 		return;
 	}
@@ -95,14 +100,11 @@ static void update_wobbly_windows(
 		dt = 0.033f;
 	}
 
-	/*
-	 * Spring constants.
-	 *
-	 * Larger SPRING = snaps back faster.
-	 * Larger DAMPING = loses energy faster.
-	 */
-	const float SPRING = 42.0f;
-	const float DAMPING = 7.5f;
+	const float SPRING =
+		42.0f;
+
+	const float DAMPING =
+		7.5f;
 
 	struct shady_toplevel *toplevel;
 
@@ -112,8 +114,11 @@ static void update_wobbly_windows(
 		link
 	) {
 		/*
-		 * F = -kx
+		 * --------------------------------------------------------
+		 * Existing wobble simulation
+		 * --------------------------------------------------------
 		 */
+
 		float ax =
 			-toplevel->wobble_x *
 			SPRING;
@@ -123,17 +128,17 @@ static void update_wobbly_windows(
 			SPRING;
 
 		toplevel->wobble_vx +=
-			ax * dt;
+			ax *
+			dt;
 
 		toplevel->wobble_vy +=
-			ay * dt;
+			ay *
+			dt;
 
-		/*
-		 * Exponential-ish damping.
-		 */
 		float damping =
 			1.0f -
-			DAMPING * dt;
+			DAMPING *
+			dt;
 
 		if (damping < 0.0f) {
 			damping = 0.0f;
@@ -153,24 +158,66 @@ static void update_wobbly_windows(
 			toplevel->wobble_vy *
 			dt;
 
-		/*
-		 * Stop microscopic movement once the spring is effectively
-		 * at rest.
-		 */
 		if (
-			fabsf(toplevel->wobble_x) < 0.00005f &&
-			fabsf(toplevel->wobble_vx) < 0.00005f
+			fabsf(toplevel->wobble_x) <
+				0.00005f &&
+			fabsf(toplevel->wobble_vx) <
+				0.00005f
 		) {
-			toplevel->wobble_x = 0.0f;
-			toplevel->wobble_vx = 0.0f;
+			toplevel->wobble_x =
+				0.0f;
+
+			toplevel->wobble_vx =
+				0.0f;
 		}
 
 		if (
-			fabsf(toplevel->wobble_y) < 0.00005f &&
-			fabsf(toplevel->wobble_vy) < 0.00005f
+			fabsf(toplevel->wobble_y) <
+				0.00005f &&
+			fabsf(toplevel->wobble_vy) <
+				0.00005f
 		) {
-			toplevel->wobble_y = 0.0f;
-			toplevel->wobble_vy = 0.0f;
+			toplevel->wobble_y =
+				0.0f;
+
+			toplevel->wobble_vy =
+				0.0f;
+		}
+
+		/*
+		 * --------------------------------------------------------
+		 * Close animation
+		 * --------------------------------------------------------
+		 */
+
+		if (
+			toplevel->closing &&
+			!toplevel->close_sent
+		) {
+			toplevel->close_progress +=
+				dt /
+				CLOSE_ANIMATION_SECONDS;
+
+			if (
+				toplevel->close_progress >=
+				1.0f
+			) {
+				toplevel->close_progress =
+					1.0f;
+
+				/*
+				 * Mark first.
+				 *
+				 * The client may react immediately and cause
+				 * lifecycle callbacks, so don't send this twice.
+				 */
+				toplevel->close_sent =
+					true;
+
+				wlr_xdg_toplevel_send_close(
+					toplevel->xdg_toplevel
+				);
+			}
 		}
 	}
 }
@@ -475,7 +522,7 @@ void shady_render_output_frame(
 	float time_seconds =
 		shader_time_seconds();
 
-	update_wobbly_windows(
+	update_window_animations(
 		server
 	);
 
@@ -576,7 +623,8 @@ void shady_render_output_frame(
 			mvp,
 			time_seconds,
 			toplevel->wobble_x,
-			toplevel->wobble_y
+			toplevel->wobble_y,
+			toplevel->close_progress
 		);
 	}
 

@@ -26,6 +26,7 @@ Windows stay on a flat desktop plane. You move the **camera** (default view is f
 | Alt + Q / E | Orbit yaw |
 | Alt + `=` / `-` | Zoom |
 | Alt + `0` | Reset to frontal 2D view |
+| Alt + F11 | close the window |
 
 Pointer clicks are raycast onto the window surfaces.
 

@@ -241,6 +241,74 @@ static void keyboard_handle_modifiers(
 		&keyboard->wlr_keyboard->modifiers);
 }
 
+static struct shady_toplevel *focused_toplevel(
+	struct shady_server *server
+) {
+	struct wlr_surface *surface =
+		server->seat->keyboard_state.focused_surface;
+
+	if (!surface) {
+		return NULL;
+	}
+
+	struct wlr_xdg_toplevel *xdg_toplevel =
+		wlr_xdg_toplevel_try_from_wlr_surface(
+			surface
+		);
+
+	if (!xdg_toplevel) {
+		return NULL;
+	}
+
+	struct shady_toplevel *toplevel;
+
+	wl_list_for_each(
+		toplevel,
+		&server->toplevels,
+		link
+	) {
+		if (toplevel->xdg_toplevel == xdg_toplevel) {
+			return toplevel;
+		}
+	}
+
+	return NULL;
+}
+
+static void begin_close_animation(
+	struct shady_server *server
+) {
+	struct shady_toplevel *toplevel =
+		focused_toplevel(server);
+
+	if (!toplevel) {
+		return;
+	}
+
+	/*
+	 * Ignore repeated Alt+F4 presses while the window is already
+	 * disappearing.
+	 */
+	if (toplevel->closing) {
+		return;
+	}
+
+	toplevel->closing = true;
+	toplevel->close_sent = false;
+	toplevel->close_progress = 0.0f;
+
+	/*
+	 * Give the window a small initial kick so the close transition
+	 * blends naturally with the existing wobbly effect.
+	 */
+	toplevel->wobble_vx += 0.10f;
+	toplevel->wobble_vy -= 0.07f;
+
+	shady_render_schedule_all_outputs(
+		server
+	);
+}
+
 static bool handle_keybinding(struct shady_server *server, xkb_keysym_t sym) {
 	bool camera_changed = false;
 	struct shady_vec3 right, up, forward;
@@ -256,6 +324,9 @@ static bool handle_keybinding(struct shady_server *server, xkb_keysym_t sym) {
 		struct shady_toplevel *next_toplevel =
 			wl_container_of(server->toplevels.prev, next_toplevel, link);
 		focus_toplevel(next_toplevel);
+		break;
+	case XKB_KEY_F11:
+		begin_close_animation(server);
 		break;
 	case XKB_KEY_Left:
 	case XKB_KEY_a:

@@ -110,6 +110,20 @@ struct shady_toplevel {
 	double last_move_y;
 
 	bool wobble_dragging;
+
+		/*
+	 * Animated close state.
+	 *
+	 * Alt+F4 starts the animation instead of immediately sending the
+	 * xdg_toplevel close event.
+	 *
+	 * close_progress:
+	 *     0.0 = normal window
+	 *     1.0 = fully crumpled
+	 */
+	bool closing;
+	bool close_sent;
+	float close_progress;
 };
 
 struct shady_popup {

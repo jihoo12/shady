@@ -465,6 +465,12 @@ bool shady_gl_pipeline_init(
 			"u_wobble"
 		);
 
+	pipeline->u_close_progress_2d =
+		glGetUniformLocation(
+			pipeline->prog_2d,
+			"u_close_progress"
+		);
+
 	/*
 	 * EGL external texture uniforms.
 	 */
@@ -502,6 +508,12 @@ bool shady_gl_pipeline_init(
 		glGetUniformLocation(
 			pipeline->prog_ext,
 			"u_wobble"
+		);
+
+	pipeline->u_close_progress_ext =
+		glGetUniformLocation(
+			pipeline->prog_ext,
+			"u_close_progress"
 		);
 
 	wlr_log(
@@ -564,7 +576,8 @@ void shady_gl_pipeline_draw_window(
 	const float mvp[16],
 	float time_seconds,
 	float wobble_x,
-	float wobble_y
+	float wobble_y,
+	float close_progress
 ) {
 	bool external =
 		(target == GL_TEXTURE_EXTERNAL_OES);
@@ -604,6 +617,11 @@ void shady_gl_pipeline_draw_window(
 			? pipeline->u_wobble_ext
 			: pipeline->u_wobble_2d;
 
+	GLint u_close_progress =
+		external
+			? pipeline->u_close_progress_ext
+			: pipeline->u_close_progress_2d;
+
 	glUseProgram(prog);
 
 	glUniformMatrix4fv(
@@ -633,6 +651,11 @@ void shady_gl_pipeline_draw_window(
 		u_wobble,
 		wobble_x,
 		wobble_y
+	);
+
+	glUniform1f(
+		u_close_progress,
+		close_progress
 	);
 
 	glUniform1i(
@@ -687,9 +710,6 @@ void shady_gl_pipeline_draw_window(
 		glDepthMask(GL_TRUE);
 	}
 
-	/*
-	 * Render the subdivided mesh instead of the old four-vertex quad.
-	 */
 	glBindBuffer(
 		GL_ARRAY_BUFFER,
 		pipeline->mesh_vbo
@@ -728,4 +748,3 @@ void shady_gl_pipeline_draw_window(
 
 	glUseProgram(0);
 }
-
