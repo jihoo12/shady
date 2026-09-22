@@ -97,6 +97,47 @@ static struct wl_list close_snapshots;
  */
 #define CLOSE_RESTORE_SECONDS 0.32f
 
+#define FPS_FLOOR_Y -0.62f
+#define FPS_EYE_HEIGHT 0.40f
+#define FPS_MOVE_SPEED 1.25f
+#define FPS_GRAVITY 3.8f
+#define FPS_JUMP_SPEED 1.45f
+
+static void update_fps_camera(struct shady_server *server, float dt) {
+	struct shady_camera *cam = &server->camera;
+	if (!cam->first_person) return;
+
+	float sy = sinf(cam->yaw);
+	float cy = cosf(cam->yaw);
+	float fx = -sy, fz = -cy;
+	float rx = cy, rz = -sy;
+	float mx = 0.f, mz = 0.f;
+	if (server->fps_forward) { mx += fx; mz += fz; }
+	if (server->fps_back) { mx -= fx; mz -= fz; }
+	if (server->fps_right) { mx += rx; mz += rz; }
+	if (server->fps_left) { mx -= rx; mz -= rz; }
+	float ml = sqrtf(mx * mx + mz * mz);
+	if (ml > 0.001f) {
+		cam->pos_x += mx / ml * FPS_MOVE_SPEED * dt;
+		cam->pos_z += mz / ml * FPS_MOVE_SPEED * dt;
+	}
+
+	if (server->fps_jump_queued && cam->grounded) {
+		cam->vel_y = FPS_JUMP_SPEED;
+		cam->grounded = false;
+	}
+	server->fps_jump_queued = false;
+	cam->vel_y -= FPS_GRAVITY * dt;
+	cam->pos_y += cam->vel_y * dt;
+
+	const float standing_y = FPS_FLOOR_Y + FPS_EYE_HEIGHT;
+	if (cam->pos_y <= standing_y) {
+		cam->pos_y = standing_y;
+		cam->vel_y = 0.f;
+		cam->grounded = true;
+	}
+}
+
 static float shader_time_seconds(void) {
 	struct timespec now;
 
@@ -772,6 +813,30 @@ void shady_render_output_frame(
 	 */
 	float time_seconds =
 		shader_time_seconds();
+
+	/*
+	 * The renderer already owns a monotonic frame clock. Reuse the same
+	 * capped timestep as animation physics for first-person movement.
+	 */
+	static struct timespec fps_last_time;
+	static bool fps_clock_ready;
+	struct timespec fps_now;
+	clock_gettime(CLOCK_MONOTONIC, &fps_now);
+	float fps_dt = 0.f;
+	if (fps_clock_ready) {
+		fps_dt = (float)(fps_now.tv_sec - fps_last_time.tv_sec)
+			+ (float)(fps_now.tv_nsec - fps_last_time.tv_nsec) / 1000000000.0f;
+		if (fps_dt > 0.033f) fps_dt = 0.033f;
+	}
+	fps_last_time = fps_now;
+	fps_clock_ready = true;
+	update_fps_camera(server, fps_dt);
+
+	/* Camera physics changed the view, so rebuild matrices for this frame. */
+	if (server->camera.first_person && fps_dt > 0.f) {
+		shady_render_camera_matrices(server, buf_w, buf_h, view, proj);
+		shady_mat4_multiply(vp, proj, view);
+	}
 
 	update_window_animations(
 		server

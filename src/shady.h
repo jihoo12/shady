@@ -92,6 +92,10 @@ struct shady_server {
 	double cam_grab_x, cam_grab_y;
 	float cam_grab_yaw, cam_grab_pitch;
 	float cam_grab_target_x, cam_grab_target_y, cam_grab_target_z;
+
+	/* FPS controls are compositor-owned while first-person mode is active. */
+	bool fps_forward, fps_back, fps_left, fps_right;
+	bool fps_jump_queued;
 };
 
 struct shady_output {

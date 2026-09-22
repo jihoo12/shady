@@ -10,6 +10,12 @@ struct shady_camera {
 	float target_x; /* look-at / orbit center (world) */
 	float target_y;
 	float target_z;
+
+	/* First-person mode: eye position + velocity in world space. */
+	bool first_person;
+	float pos_x, pos_y, pos_z;
+	float vel_y;
+	bool grounded;
 };
 
 struct shady_vec3 {

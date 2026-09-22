@@ -15,6 +15,12 @@ void shady_camera_reset(struct shady_camera *cam) {
 	cam->target_x = 0.f;
 	cam->target_y = 0.f;
 	cam->target_z = 0.f;
+	cam->first_person = false;
+	cam->pos_x = 0.f;
+	cam->pos_y = -0.22f;
+	cam->pos_z = SHADY_CAMERA_DEFAULT_DIST;
+	cam->vel_y = 0.f;
+	cam->grounded = false;
 }
 
 void shady_mat4_identity(float m[16]) {
@@ -161,6 +167,10 @@ void shady_mat4_rotate_y(float out[16], float radians) {
 }
 
 void shady_camera_eye(const struct shady_camera *cam, struct shady_vec3 *eye) {
+	if (cam->first_person) {
+		*eye = (struct shady_vec3){ cam->pos_x, cam->pos_y, cam->pos_z };
+		return;
+	}
 	float cp = cosf(cam->pitch);
 	float sp = sinf(cam->pitch);
 	float cy = cosf(cam->yaw);
@@ -216,9 +226,17 @@ void shady_camera_basis(const struct shady_camera *cam,
 void shady_camera_view(const struct shady_camera *cam, float view[16]) {
 	struct shady_vec3 eye;
 	shady_camera_eye(cam, &eye);
-	struct shady_vec3 center = {
-		cam->target_x, cam->target_y, cam->target_z,
-	};
+	struct shady_vec3 center;
+	if (cam->first_person) {
+		float cp = cosf(cam->pitch);
+		center = (struct shady_vec3){
+			eye.x - sinf(cam->yaw) * cp,
+			eye.y + sinf(cam->pitch),
+			eye.z - cosf(cam->yaw) * cp,
+		};
+	} else {
+		center = (struct shady_vec3){ cam->target_x, cam->target_y, cam->target_z };
+	}
 	struct shady_vec3 up = { 0.f, 1.f, 0.f };
 	shady_mat4_look_at(view, eye, center, up);
 }

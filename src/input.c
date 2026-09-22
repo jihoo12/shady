@@ -31,6 +31,7 @@
 #define WINDOW_Z_STEP 0.055f
 #define WINDOW_Z_MIN -1.5f
 #define WINDOW_Z_MAX 0.75f
+#define FPS_LOOK_SENS 0.0032f
 
 void reset_cursor_mode(struct shady_server *server) {
 	server->cursor_mode = SHADY_CURSOR_PASSTHROUGH;
@@ -331,6 +332,25 @@ static void begin_close_animation(
 }
 
 static bool handle_keybinding(struct shady_server *server, xkb_keysym_t sym) {
+	if (sym == XKB_KEY_F2) {
+		server->camera.first_person = !server->camera.first_person;
+		server->fps_forward = server->fps_back = false;
+		server->fps_left = server->fps_right = false;
+		server->fps_jump_queued = false;
+		if (server->camera.first_person) {
+			struct shady_vec3 eye;
+			shady_camera_eye(&server->camera, &eye);
+			server->camera.pos_x = eye.x;
+			server->camera.pos_y = eye.y;
+			server->camera.pos_z = eye.z;
+			server->camera.vel_y = 0.f;
+			server->camera.grounded = false;
+			wlr_seat_pointer_clear_focus(server->seat);
+		}
+		shady_render_schedule_all_outputs(server);
+		return true;
+	}
+
 	bool camera_changed = false;
 	struct shady_vec3 right, up, forward;
 
@@ -434,10 +454,35 @@ static void keyboard_handle_key(
 
 	bool handled = false;
 	uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->wlr_keyboard);
-	if ((modifiers & WLR_MODIFIER_ALT) &&
+
+	/* F2 toggles first-person mode without requiring Alt. */
+	if (event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
+		for (int j = 0; j < nsyms; j++) {
+			if (syms[j] == XKB_KEY_F2) handled = handle_keybinding(server, syms[j]);
+		}
+	}
+
+	if (server->camera.first_person) {
+		bool pressed = event->state == WL_KEYBOARD_KEY_STATE_PRESSED;
+		for (int j = 0; j < nsyms; j++) {
+			switch (syms[j]) {
+			case XKB_KEY_w: case XKB_KEY_W: server->fps_forward = pressed; handled = true; break;
+			case XKB_KEY_s: case XKB_KEY_S: server->fps_back = pressed; handled = true; break;
+			case XKB_KEY_a: case XKB_KEY_A: server->fps_left = pressed; handled = true; break;
+			case XKB_KEY_d: case XKB_KEY_D: server->fps_right = pressed; handled = true; break;
+			case XKB_KEY_space:
+				if (pressed) server->fps_jump_queued = true;
+				handled = true;
+				break;
+			default: break;
+			}
+		}
+	}
+
+	if (!handled && (modifiers & WLR_MODIFIER_ALT) &&
 			event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
-		for (int i = 0; i < nsyms; i++) {
-			handled = handle_keybinding(server, syms[i]);
+		for (int j = 0; j < nsyms; j++) {
+			handled = handle_keybinding(server, syms[j]);
 		}
 	}
 
@@ -545,6 +590,14 @@ void server_cursor_motion(struct wl_listener *listener, void *data) {
 	struct shady_server *server =
 		wl_container_of(listener, server, cursor_motion);
 	struct wlr_pointer_motion_event *event = data;
+	if (server->camera.first_person) {
+		server->camera.yaw -= (float)event->delta_x * FPS_LOOK_SENS;
+		server->camera.pitch -= (float)event->delta_y * FPS_LOOK_SENS;
+		clamp_camera(&server->camera);
+		wlr_seat_pointer_clear_focus(server->seat);
+		shady_render_schedule_all_outputs(server);
+		return;
+	}
 	wlr_cursor_move(server->cursor, &event->pointer->base,
 			event->delta_x, event->delta_y);
 	process_cursor_motion(server, event->time_msec);
@@ -573,6 +626,11 @@ void server_cursor_button(struct wl_listener *listener, void *data) {
 		wl_container_of(listener, server, cursor_button);
 	struct wlr_pointer_button_event *event = data;
 	uint32_t mods = seat_modifiers(server);
+
+	if (server->camera.first_person) {
+		/* Mouse buttons are reserved for the future grab/raycast interaction. */
+		return;
+	}
 
 	/* Right-drag orbits. Alt+middle-drag pans (plain middle goes to clients). */
 	if (event->button == BTN_RIGHT
