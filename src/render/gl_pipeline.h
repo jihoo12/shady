@@ -40,7 +40,9 @@ struct shady_gl_pipeline {
 	/* Solid side-wall pipeline for real window thickness. */
 	GLuint side_prog;
 	GLint side_u_mvp;
-	GLint side_u_color;
+	GLint side_u_model;
+	GLint side_u_light_dir;
+	GLint side_u_base_color;
 	GLuint side_vbo;
 	GLsizei side_vertex_count;
 };
@@ -68,7 +70,8 @@ void shady_gl_pipeline_draw_window(
 
 void shady_gl_pipeline_draw_sides(
 	struct shady_gl_pipeline *pipeline,
-	const float mvp[16]
+	const float mvp[16],
+	const float model[16]
 );
 
 bool shady_gl_pipeline_copy_texture(

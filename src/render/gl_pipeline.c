@@ -27,16 +27,31 @@ static const float WINDOW_TINT[4] = {
 
 static const char *SIDE_VERT =
 	"attribute vec3 a_pos;\n"
+	"attribute vec3 a_normal;\n"
 	"uniform mat4 u_mvp;\n"
+	"uniform mat4 u_model;\n"
+	"varying vec3 v_normal;\n"
 	"void main() {\n"
 	"    gl_Position = u_mvp * vec4(a_pos, 1.0);\n"
 	"    gl_Position.y = -gl_Position.y;\n"
+	"    v_normal = normalize(mat3(u_model) * a_normal);\n"
 	"}\n";
 
 static const char *SIDE_FRAG =
 	"precision mediump float;\n"
-	"uniform vec4 u_color;\n"
-	"void main() { gl_FragColor = u_color; }\n";
+	"uniform vec3 u_light_dir;\n"
+	"uniform vec4 u_base_color;\n"
+	"varying vec3 v_normal;\n"
+	"void main() {\n"
+	"    vec3 n = normalize(v_normal);\n"
+	"    vec3 l = normalize(u_light_dir);\n"
+	"    float diffuse = max(dot(n, l), 0.0);\n"
+	"    float rim = pow(1.0 - abs(n.z), 2.0);\n"
+	"    float light = 0.24 + diffuse * 0.76;\n"
+	"    vec3 color = u_base_color.rgb * light;\n"
+	"    color += vec3(0.035, 0.075, 0.13) * rim;\n"
+	"    gl_FragColor = vec4(color, u_base_color.a);\n"
+	"}\n";
 
 static const char *COPY_VERT =
 	"attribute vec3 a_pos;\n"
@@ -224,6 +239,11 @@ static GLuint link_program(
 		0,
 		"a_pos"
 	);
+	glBindAttribLocation(
+		prog,
+		1,
+		"a_normal"
+	);
 
 	glLinkProgram(prog);
 
@@ -407,12 +427,23 @@ static bool create_window_mesh(
 }
 
 static bool create_side_mesh(struct shady_gl_pipeline *pipeline) {
-	/* Four walls of a unit box. Front is z=0, back edge is z=-1. */
+	/*
+	 * Four walls of a unit box. Each vertex stores position + face normal.
+	 * Front is z=0 and the back edge is z=-1.
+	 */
 	static const GLfloat v[] = {
-		/* left */   0,0,0,  0,1,0,  0,0,-1,  0,0,-1,  0,1,0,  0,1,-1,
-		/* right */  1,0,0,  1,0,-1, 1,1,0,   1,0,-1, 1,1,-1, 1,1,0,
-		/* bottom */ 0,0,0,  0,0,-1, 1,0,0,   1,0,0,  0,0,-1, 1,0,-1,
-		/* top */    0,1,0,  1,1,0,  0,1,-1,  0,1,-1, 1,1,0,  1,1,-1,
+		/* left, normal -X */
+		0,0,0, -1,0,0,  0,1,0, -1,0,0,  0,0,-1, -1,0,0,
+		0,0,-1, -1,0,0,  0,1,0, -1,0,0,  0,1,-1, -1,0,0,
+		/* right, normal +X */
+		1,0,0, 1,0,0,  1,0,-1, 1,0,0,  1,1,0, 1,0,0,
+		1,0,-1, 1,0,0,  1,1,-1, 1,0,0,  1,1,0, 1,0,0,
+		/* bottom, normal -Y */
+		0,0,0, 0,-1,0,  0,0,-1, 0,-1,0,  1,0,0, 0,-1,0,
+		1,0,0, 0,-1,0,  0,0,-1, 0,-1,0,  1,0,-1, 0,-1,0,
+		/* top, normal +Y */
+		0,1,0, 0,1,0,  1,1,0, 0,1,0,  0,1,-1, 0,1,0,
+		0,1,-1, 0,1,0,  1,1,0, 0,1,0,  1,1,-1, 0,1,0,
 	};
 	glGenBuffers(1, &pipeline->side_vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, pipeline->side_vbo);
@@ -615,7 +646,9 @@ bool shady_gl_pipeline_init(
 		return false;
 	}
 	pipeline->side_u_mvp = glGetUniformLocation(pipeline->side_prog, "u_mvp");
-	pipeline->side_u_color = glGetUniformLocation(pipeline->side_prog, "u_color");
+	pipeline->side_u_model = glGetUniformLocation(pipeline->side_prog, "u_model");
+	pipeline->side_u_light_dir = glGetUniformLocation(pipeline->side_prog, "u_light_dir");
+	pipeline->side_u_base_color = glGetUniformLocation(pipeline->side_prog, "u_base_color");
 
 	wlr_log(
 		WLR_INFO,
@@ -877,18 +910,32 @@ void shady_gl_pipeline_draw_window(
 
 void shady_gl_pipeline_draw_sides(
 	struct shady_gl_pipeline *pipeline,
-	const float mvp[16]
+	const float mvp[16],
+	const float model[16]
 ) {
 	glUseProgram(pipeline->side_prog);
 	glUniformMatrix4fv(pipeline->side_u_mvp, 1, GL_FALSE, mvp);
-	glUniform4f(pipeline->side_u_color, 0.075f, 0.09f, 0.14f, 1.0f);
+	glUniformMatrix4fv(pipeline->side_u_model, 1, GL_FALSE, model);
+
+	/* A fixed world-space key light from upper-left and slightly forward. */
+	glUniform3f(pipeline->side_u_light_dir, -0.45f, 0.72f, 0.53f);
+	glUniform4f(pipeline->side_u_base_color, 0.16f, 0.21f, 0.31f, 1.0f);
 
 	glDisable(GL_BLEND);
 	glDepthMask(GL_TRUE);
 	glBindBuffer(GL_ARRAY_BUFFER, pipeline->side_vbo);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void *)0);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
+		6 * sizeof(GLfloat), (void *)0);
 	glEnableVertexAttribArray(0);
+
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE,
+		6 * sizeof(GLfloat), (void *)(3 * sizeof(GLfloat)));
+	glEnableVertexAttribArray(1);
+
 	glDrawArrays(GL_TRIANGLES, 0, pipeline->side_vertex_count);
+
+	glDisableVertexAttribArray(1);
 	glDisableVertexAttribArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glUseProgram(0);

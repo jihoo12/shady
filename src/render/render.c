@@ -908,7 +908,7 @@ void shady_render_output_frame(
 		);
 
 		if (toplevel->close_progress < 0.02f) {
-			shady_gl_pipeline_draw_sides(&pipeline, mvp);
+			shady_gl_pipeline_draw_sides(&pipeline, mvp, model);
 		}
 
 		shady_gl_pipeline_draw_window(
@@ -969,7 +969,7 @@ void shady_render_output_frame(
 		);
 
 		if (snapshot->progress < 0.02f) {
-			shady_gl_pipeline_draw_sides(&pipeline, mvp);
+			shady_gl_pipeline_draw_sides(&pipeline, mvp, model);
 		}
 
 		shady_gl_pipeline_draw_window(
