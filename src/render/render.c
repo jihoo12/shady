@@ -170,7 +170,17 @@ static void update_fps_held_window(
 	wlr_scene_node_set_position(&toplevel->scene_tree->node, x, y);
 	toplevel->z = cz;
 
-	/* Give the flexible body a small lag while it follows the camera. */
+	/*
+	 * A held window faces the player instead of remaining parallel to the
+	 * desktop XY plane. Keep a little spring freedom so carrying it still
+	 * feels physical rather than welded to the camera.
+	 */
+	float target_tilt_x = -server->camera.pitch;
+	float target_tilt_y = -server->camera.yaw;
+	while (target_tilt_y > 3.14159265f) target_tilt_y -= 6.28318530f;
+	while (target_tilt_y < -3.14159265f) target_tilt_y += 6.28318530f;
+	toplevel->tilt_vx += (target_tilt_x - toplevel->tilt_x) * 0.18f;
+	toplevel->tilt_vy += (target_tilt_y - toplevel->tilt_y) * 0.18f;
 	toplevel->wobble_vx += forward.x * 0.0025f;
 	toplevel->wobble_vy += forward.y * 0.0025f;
 }

@@ -100,6 +100,9 @@ struct shady_server {
 	/* Window currently held by the first-person camera. */
 	struct shady_toplevel *fps_held_toplevel;
 	float fps_hold_distance;
+
+	/* F3 toggles between navigation and normal client input in FPS mode. */
+	bool fps_input_capture;
 };
 
 struct shady_output {

@@ -334,12 +334,25 @@ static void begin_close_animation(
 }
 
 static bool handle_keybinding(struct shady_server *server, xkb_keysym_t sym) {
+	if (sym == XKB_KEY_F3 && server->camera.first_person) {
+		server->fps_input_capture = !server->fps_input_capture;
+		server->fps_forward = server->fps_back = false;
+		server->fps_left = server->fps_right = false;
+		server->fps_jump_queued = false;
+		if (server->fps_input_capture) {
+			wlr_seat_pointer_clear_focus(server->seat);
+		}
+		shady_render_schedule_all_outputs(server);
+		return true;
+	}
+
 	if (sym == XKB_KEY_F2) {
 		server->camera.first_person = !server->camera.first_person;
 		server->fps_forward = server->fps_back = false;
 		server->fps_left = server->fps_right = false;
 		server->fps_jump_queued = false;
 		server->fps_held_toplevel = NULL;
+		server->fps_input_capture = server->camera.first_person;
 		if (server->camera.first_person) {
 			struct shady_vec3 eye;
 			shady_camera_eye(&server->camera, &eye);
@@ -458,14 +471,15 @@ static void keyboard_handle_key(
 	bool handled = false;
 	uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->wlr_keyboard);
 
-	/* F2 toggles first-person mode without requiring Alt. */
+	/* F2 changes camera mode; F3 releases/captures FPS controls for typing. */
 	if (event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
 		for (int j = 0; j < nsyms; j++) {
-			if (syms[j] == XKB_KEY_F2) handled = handle_keybinding(server, syms[j]);
+			if (syms[j] == XKB_KEY_F2 || syms[j] == XKB_KEY_F3)
+				handled = handle_keybinding(server, syms[j]);
 		}
 	}
 
-	if (server->camera.first_person) {
+	if (server->camera.first_person && server->fps_input_capture) {
 		bool pressed = event->state == WL_KEYBOARD_KEY_STATE_PRESSED;
 		for (int j = 0; j < nsyms; j++) {
 			switch (syms[j]) {
@@ -593,7 +607,7 @@ void server_cursor_motion(struct wl_listener *listener, void *data) {
 	struct shady_server *server =
 		wl_container_of(listener, server, cursor_motion);
 	struct wlr_pointer_motion_event *event = data;
-	if (server->camera.first_person) {
+	if (server->camera.first_person && server->fps_input_capture) {
 		server->camera.yaw -= (float)event->delta_x * FPS_LOOK_SENS;
 		server->camera.pitch -= (float)event->delta_y * FPS_LOOK_SENS;
 		clamp_camera(&server->camera);
@@ -630,7 +644,7 @@ void server_cursor_button(struct wl_listener *listener, void *data) {
 	struct wlr_pointer_button_event *event = data;
 	uint32_t mods = seat_modifiers(server);
 
-	if (server->camera.first_person) {
+	if (server->camera.first_person && server->fps_input_capture) {
 		if (event->button == BTN_LEFT &&
 				event->state == WL_POINTER_BUTTON_STATE_PRESSED) {
 			if (server->fps_held_toplevel) {
@@ -701,7 +715,8 @@ void server_cursor_axis(struct wl_listener *listener, void *data) {
 		wl_container_of(listener, server, cursor_axis);
 	struct wlr_pointer_axis_event *event = data;
 
-	if (server->camera.first_person && server->fps_held_toplevel &&
+	if (server->camera.first_person && server->fps_input_capture &&
+			server->fps_held_toplevel &&
 			event->orientation == WL_POINTER_AXIS_VERTICAL_SCROLL) {
 		server->fps_hold_distance += (float)event->delta * 0.0025f;
 		if (server->fps_hold_distance < FPS_HOLD_MIN)
