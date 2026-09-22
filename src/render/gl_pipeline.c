@@ -531,7 +531,10 @@ static bool create_side_mesh(struct shady_gl_pipeline *pipeline) {
 	 * follow the same flexible deformation as the front surface.
 	 */
 	const int segments = WOBBLE_MESH_X;
-	const int vertex_count = segments * 4 * 6;
+	/* Four walls plus a solid back face, all using the side lighting shader. */
+	const int wall_vertex_count = segments * 4 * 6;
+	const int back_vertex_count = 6;
+	const int vertex_count = wall_vertex_count + back_vertex_count;
 	GLfloat *v = calloc((size_t)vertex_count * 6, sizeof(GLfloat));
 	if (!v) return false;
 	int n = 0;
@@ -550,6 +553,9 @@ static bool create_side_mesh(struct shady_gl_pipeline *pipeline) {
 		SIDE_QUAD(a,0,0, b,0,0, a,0,-1, b,0,-1, 0,-1,0);
 		SIDE_QUAD(a,1,0, a,1,-1, b,1,0, b,1,-1, 0,1,0);
 	}
+	/* Back plate closes the shell at local z=-1. The normal faces away from
+	 * the textured front so lighting clearly distinguishes front/back. */
+	SIDE_QUAD(0,0,-1, 0,1,-1, 1,0,-1, 1,1,-1, 0,0,-1);
 #undef SIDE_QUAD
 #undef SIDE_VERTEX
 	glGenBuffers(1, &pipeline->side_vbo);
