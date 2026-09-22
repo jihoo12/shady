@@ -71,6 +71,7 @@ static const char *SHADOW_VERT =
 	"uniform mat4 u_vp;\n"
 	"uniform mat4 u_model;\n"
 	"uniform vec2 u_wobble;\n"
+	"uniform float u_softness;\n"
 	"varying vec2 v_uv;\n"
 	"void main() {\n"
 	"    vec2 uv = a_pos.xy;\n"
@@ -97,11 +98,15 @@ static const char *SHADOW_VERT =
 
 static const char *SHADOW_FRAG =
 	"precision mediump float;\n"
+	"uniform float u_softness;\n"
+	"uniform float u_opacity;\n"
 	"varying vec2 v_uv;\n"
 	"void main() {\n"
 	"    float edge = min(min(v_uv.x, 1.0-v_uv.x), min(v_uv.y, 1.0-v_uv.y));\n"
-	"    float feather = smoothstep(0.0, 0.055, edge);\n"
-	"    gl_FragColor = vec4(0.0, 0.0, 0.0, 0.28 * feather);\n"
+	"    float feather = smoothstep(0.0, u_softness, edge);\n"
+	"    float core = smoothstep(0.0, u_softness * 2.2, edge);\n"
+	"    float alpha = u_opacity * mix(0.48, 1.0, core) * feather;\n"
+	"    gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);\n"
 	"}\n";
 
 static const char *FLOOR_VERT =
@@ -792,6 +797,8 @@ bool shady_gl_pipeline_init(
 	pipeline->shadow_u_vp = glGetUniformLocation(pipeline->shadow_prog, "u_vp");
 	pipeline->shadow_u_model = glGetUniformLocation(pipeline->shadow_prog, "u_model");
 	pipeline->shadow_u_wobble = glGetUniformLocation(pipeline->shadow_prog, "u_wobble");
+	pipeline->shadow_u_softness = glGetUniformLocation(pipeline->shadow_prog, "u_softness");
+	pipeline->shadow_u_opacity = glGetUniformLocation(pipeline->shadow_prog, "u_opacity");
 
 	wlr_log(
 		WLR_INFO,
@@ -1119,12 +1126,27 @@ void shady_gl_pipeline_draw_shadow(
 	const float vp[16],
 	const float model[16],
 	float wobble_x,
-	float wobble_y
+	float wobble_y,
+	float height
 ) {
 	glUseProgram(pipeline->shadow_prog);
 	glUniformMatrix4fv(pipeline->shadow_u_vp, 1, GL_FALSE, vp);
 	glUniformMatrix4fv(pipeline->shadow_u_model, 1, GL_FALSE, model);
 	glUniform2f(pipeline->shadow_u_wobble, wobble_x, wobble_y);
+
+	/*
+	 * Approximate an area light: as the window moves away from the ground,
+	 * widen the penumbra and reduce density. Height is world-space Z here,
+	 * which is the user's explicit depth control, so it gives a stable and
+	 * perceptible softness cue even while the camera orbits.
+	 */
+	float h = height;
+	if (h < 0.0f) h = -h;
+	if (h > 1.5f) h = 1.5f;
+	float softness = 0.035f + h * 0.085f;
+	float opacity = 0.32f / (1.0f + h * 1.35f);
+	glUniform1f(pipeline->shadow_u_softness, softness);
+	glUniform1f(pipeline->shadow_u_opacity, opacity);
 
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

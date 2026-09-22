@@ -799,7 +799,7 @@ void shady_render_output_frame(
 		shady_window_model(shadow_model, layout_x, layout_y, tw, th,
 			logical_w, logical_h, toplevel->z, toplevel->tilt_x, toplevel->tilt_y);
 		shady_gl_pipeline_draw_shadow(&pipeline, vp, shadow_model,
-			toplevel->wobble_x, toplevel->wobble_y);
+			toplevel->wobble_x, toplevel->wobble_y, toplevel->z);
 	}
 
 

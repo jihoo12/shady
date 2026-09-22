@@ -62,6 +62,8 @@ struct shady_gl_pipeline {
 	GLint shadow_u_vp;
 	GLint shadow_u_model;
 	GLint shadow_u_wobble;
+	GLint shadow_u_softness;
+	GLint shadow_u_opacity;
 };
 
 bool shady_gl_pipeline_init(
@@ -104,7 +106,8 @@ void shady_gl_pipeline_draw_shadow(
 	const float vp[16],
 	const float model[16],
 	float wobble_x,
-	float wobble_y
+	float wobble_y,
+	float height
 );
 
 bool shady_gl_pipeline_copy_texture(
