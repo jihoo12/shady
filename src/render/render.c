@@ -138,6 +138,44 @@ static void update_fps_camera(struct shady_server *server, float dt) {
 	}
 }
 
+static void update_fps_held_window(
+	struct shady_server *server, float logical_w, float logical_h
+) {
+	struct shady_toplevel *toplevel = server->fps_held_toplevel;
+	if (!server->camera.first_person || !toplevel) return;
+	struct wlr_surface *surface = toplevel->xdg_toplevel->base->surface;
+	if (!surface->mapped || logical_h <= 0.f) {
+		server->fps_held_toplevel = NULL;
+		return;
+	}
+
+	struct shady_vec3 eye, forward;
+	shady_camera_eye(&server->camera, &eye);
+	shady_camera_basis(&server->camera, NULL, NULL, &forward);
+	float d = server->fps_hold_distance;
+	float cx = eye.x + forward.x * d;
+	float cy = eye.y + forward.y * d;
+	float cz = eye.z + forward.z * d;
+
+	float tw = (float)surface->current.width;
+	float th = (float)surface->current.height;
+	float world_w = tw / logical_h;
+	float world_h = th / logical_h;
+
+	/* scene node is top-left in output pixels; held point is window center. */
+	float left_world = cx - world_w * 0.5f;
+	float bottom_world = cy - world_h * 0.5f;
+	int x = (int)(left_world * logical_h + logical_w * 0.5f);
+	int y = (int)(logical_h * 0.5f - (bottom_world + world_h) * logical_h);
+	wlr_scene_node_set_position(&toplevel->scene_tree->node, x, y);
+	toplevel->z = cz;
+
+	/* Give the flexible body a small lag while it follows the camera. */
+	toplevel->wobble_vx += forward.x * 0.0025f;
+	toplevel->wobble_vy += forward.y * 0.0025f;
+}
+
+
 static float shader_time_seconds(void) {
 	struct timespec now;
 
@@ -831,6 +869,7 @@ void shady_render_output_frame(
 	fps_last_time = fps_now;
 	fps_clock_ready = true;
 	update_fps_camera(server, fps_dt);
+	update_fps_held_window(server, logical_w, logical_h);
 
 	/* Camera physics changed the view, so rebuild matrices for this frame. */
 	if (server->camera.first_person && fps_dt > 0.f) {

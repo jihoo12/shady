@@ -184,11 +184,21 @@ void shady_camera_basis(const struct shady_camera *cam,
 		struct shady_vec3 *right, struct shady_vec3 *up, struct shady_vec3 *forward) {
 	struct shady_vec3 eye;
 	shady_camera_eye(cam, &eye);
-	struct shady_vec3 f = {
-		cam->target_x - eye.x,
-		cam->target_y - eye.y,
-		cam->target_z - eye.z,
-	};
+	struct shady_vec3 f;
+	if (cam->first_person) {
+		float cp = cosf(cam->pitch);
+		f = (struct shady_vec3){
+			-sinf(cam->yaw) * cp,
+			sinf(cam->pitch),
+			-cosf(cam->yaw) * cp,
+		};
+	} else {
+		f = (struct shady_vec3){
+			cam->target_x - eye.x,
+			cam->target_y - eye.y,
+			cam->target_z - eye.z,
+		};
+	}
 	float fl = sqrtf(f.x * f.x + f.y * f.y + f.z * f.z);
 	if (fl < 1e-8f) {
 		f = (struct shady_vec3){ 0.f, 0.f, -1.f };

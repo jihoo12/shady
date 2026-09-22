@@ -32,6 +32,8 @@
 #define WINDOW_Z_MIN -1.5f
 #define WINDOW_Z_MAX 0.75f
 #define FPS_LOOK_SENS 0.0032f
+#define FPS_HOLD_MIN 0.28f
+#define FPS_HOLD_MAX 2.50f
 
 void reset_cursor_mode(struct shady_server *server) {
 	server->cursor_mode = SHADY_CURSOR_PASSTHROUGH;
@@ -337,6 +339,7 @@ static bool handle_keybinding(struct shady_server *server, xkb_keysym_t sym) {
 		server->fps_forward = server->fps_back = false;
 		server->fps_left = server->fps_right = false;
 		server->fps_jump_queued = false;
+		server->fps_held_toplevel = NULL;
 		if (server->camera.first_person) {
 			struct shady_vec3 eye;
 			shady_camera_eye(&server->camera, &eye);
@@ -628,7 +631,24 @@ void server_cursor_button(struct wl_listener *listener, void *data) {
 	uint32_t mods = seat_modifiers(server);
 
 	if (server->camera.first_person) {
-		/* Mouse buttons are reserved for the future grab/raycast interaction. */
+		if (event->button == BTN_LEFT &&
+				event->state == WL_POINTER_BUTTON_STATE_PRESSED) {
+			if (server->fps_held_toplevel) {
+				server->fps_held_toplevel = NULL;
+			} else {
+				float distance = 0.f;
+				struct shady_toplevel *hit =
+					shady_toplevel_at_camera_center(server, &distance);
+				if (hit && distance <= FPS_HOLD_MAX) {
+					server->fps_held_toplevel = hit;
+					server->fps_hold_distance = distance;
+					if (server->fps_hold_distance < FPS_HOLD_MIN)
+						server->fps_hold_distance = FPS_HOLD_MIN;
+					focus_toplevel(hit);
+				}
+			}
+			shady_render_schedule_all_outputs(server);
+		}
 		return;
 	}
 
@@ -680,6 +700,17 @@ void server_cursor_axis(struct wl_listener *listener, void *data) {
 	struct shady_server *server =
 		wl_container_of(listener, server, cursor_axis);
 	struct wlr_pointer_axis_event *event = data;
+
+	if (server->camera.first_person && server->fps_held_toplevel &&
+			event->orientation == WL_POINTER_AXIS_VERTICAL_SCROLL) {
+		server->fps_hold_distance += (float)event->delta * 0.0025f;
+		if (server->fps_hold_distance < FPS_HOLD_MIN)
+			server->fps_hold_distance = FPS_HOLD_MIN;
+		if (server->fps_hold_distance > FPS_HOLD_MAX)
+			server->fps_hold_distance = FPS_HOLD_MAX;
+		shady_render_schedule_all_outputs(server);
+		return;
+	}
 
 	uint32_t mods = seat_modifiers(server);
 

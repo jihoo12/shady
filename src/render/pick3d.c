@@ -105,3 +105,53 @@ struct shady_toplevel *shady_toplevel_at_3d(struct shady_server *server,
 	}
 	return best;
 }
+
+
+struct shady_toplevel *shady_toplevel_at_camera_center(
+		struct shady_server *server, float *distance_out) {
+	if (distance_out) *distance_out = 0.f;
+	struct shady_vec3 eye, forward;
+	shady_camera_eye(&server->camera, &eye);
+	shady_camera_basis(&server->camera, NULL, NULL, &forward);
+	struct shady_ray ray = { .origin = eye, .dir = forward };
+
+	struct wlr_output *wlr_output = NULL;
+	struct shady_output *output;
+	wl_list_for_each(output, &server->outputs, link) {
+		wlr_output = output->wlr_output;
+		break;
+	}
+	if (!wlr_output) return NULL;
+
+	float scale = wlr_output->scale;
+	float logical_w = (float)wlr_output->width / scale;
+	float logical_h = (float)wlr_output->height / scale;
+	if (logical_w <= 0.f || logical_h <= 0.f) return NULL;
+
+	double ox = 0, oy = 0;
+	wlr_output_layout_output_coords(server->output_layout, wlr_output, &ox, &oy);
+
+	struct shady_toplevel *best = NULL;
+	float best_t = 1e30f;
+	struct shady_toplevel *toplevel;
+	wl_list_for_each(toplevel, &server->toplevels, link) {
+		struct wlr_surface *surf = toplevel->xdg_toplevel->base->surface;
+		if (!surf->mapped) continue;
+		float tw = (float)surf->current.width;
+		float th = (float)surf->current.height;
+		if (tw <= 0.f || th <= 0.f) continue;
+		float model[16];
+		shady_window_model(model,
+			(float)(toplevel->scene_tree->node.x + ox),
+			(float)(toplevel->scene_tree->node.y + oy),
+			tw, th, logical_w, logical_h, toplevel->z,
+			toplevel->tilt_x, toplevel->tilt_y);
+		float t, u, v;
+		if (shady_ray_quad_hit(&ray, model, &t, &u, &v) && t < best_t) {
+			best_t = t;
+			best = toplevel;
+		}
+	}
+	if (best && distance_out) *distance_out = best_t;
+	return best;
+}

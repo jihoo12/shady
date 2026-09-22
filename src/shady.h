@@ -96,6 +96,10 @@ struct shady_server {
 	/* FPS controls are compositor-owned while first-person mode is active. */
 	bool fps_forward, fps_back, fps_left, fps_right;
 	bool fps_jump_queued;
+
+	/* Window currently held by the first-person camera. */
+	struct shady_toplevel *fps_held_toplevel;
+	float fps_hold_distance;
 };
 
 struct shady_output {
