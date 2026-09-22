@@ -453,3 +453,33 @@ bool shady_ray_wobble_hit(const struct shady_ray *ray, const float model[16],
 	*t_out=best_t; *u_out=best_u; *v_out=best_v;
 	return true;
 }
+
+bool shady_ray_window_shell_hit(const struct shady_ray *ray, const float model[16],
+		float wx, float wy, float *t_out, float *u_out, float *v_out,
+		bool *front_out) {
+	float best_t=1e30f, best_u=0.f, best_v=0.f, t, bu, bv;
+	bool hit=false, front=false;
+	/* Exact deformed front face. */
+	if (shady_ray_wobble_hit(ray, model, wx, wy, &t, &bu, &bv)) {
+		best_t=t; best_u=bu; best_v=bv; hit=true; front=true;
+	}
+	/* Back face and four walls. Local thickness matches model z scale: z=-0.5..0.5. */
+	struct shady_vec3 b00=transform_point(model,0,0,-0.5f), b10=transform_point(model,1,0,-0.5f);
+	struct shady_vec3 b01=transform_point(model,0,1,-0.5f), b11=transform_point(model,1,1,-0.5f);
+	struct shady_vec3 f00=transform_point(model,0,0,0), f10=transform_point(model,1,0,0);
+	struct shady_vec3 f01=transform_point(model,0,1,0), f11=transform_point(model,1,1,0);
+#define TEST_TRI(A,B,C,U0,V0,U1,V1,U2,V2) do { \
+	if (ray_triangle(ray,A,B,C,&t,&bu,&bv) && t<best_t) { \
+		best_t=t; best_u=(U0)+(bu)*((U1)-(U0))+(bv)*((U2)-(U0)); \
+		best_v=(V0)+(bu)*((V1)-(V0))+(bv)*((V2)-(V0)); hit=true; front=false; } \
+} while(0)
+	TEST_TRI(b00,b01,b10,0,0,0,1,1,0); TEST_TRI(b10,b01,b11,1,0,0,1,1,1);
+	TEST_TRI(f00,b00,f01,0,0,0,0,0,1); TEST_TRI(f01,b00,b01,0,1,0,0,0,1);
+	TEST_TRI(f10,f11,b10,1,0,1,1,1,0); TEST_TRI(f11,b11,b10,1,1,1,1,1,0);
+	TEST_TRI(f00,f10,b00,0,0,1,0,0,0); TEST_TRI(f10,b10,b00,1,0,1,0,0,0);
+	TEST_TRI(f01,b01,f11,0,1,0,1,1,1); TEST_TRI(f11,b01,b11,1,1,0,1,1,1);
+#undef TEST_TRI
+	if(!hit) return false;
+	*t_out=best_t; *u_out=best_u; *v_out=best_v; if(front_out)*front_out=front;
+	return true;
+}

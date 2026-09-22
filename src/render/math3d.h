@@ -78,4 +78,9 @@ bool shady_ray_quad_hit(const struct shady_ray *ray, const float model[16],
 bool shady_ray_wobble_hit(const struct shady_ray *ray, const float model[16],
 	float wobble_x, float wobble_y, float *t_out, float *u_out, float *v_out);
 
+/* Ray vs the complete extruded window shell: front, back and four sides. */
+bool shady_ray_window_shell_hit(const struct shady_ray *ray, const float model[16],
+	float wobble_x, float wobble_y, float *t_out, float *u_out, float *v_out,
+	bool *front_out);
+
 #endif
