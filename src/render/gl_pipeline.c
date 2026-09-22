@@ -30,6 +30,7 @@ static const char *SIDE_VERT =
 	"attribute vec3 a_normal;\n"
 	"uniform mat4 u_mvp;\n"
 	"uniform mat4 u_model;\n"
+	"uniform vec2 u_wobble;\n"
 	"varying vec3 v_normal;\n"
 	"void main() {\n"
 	"    vec3 pos = a_pos;\n"
