@@ -656,6 +656,25 @@ void server_cursor_button(struct wl_listener *listener, void *data) {
 	uint32_t mods = seat_modifiers(server);
 
 	if (server->camera.first_person && server->fps_input_capture) {
+		if (event->button == BTN_RIGHT &&
+				event->state == WL_POINTER_BUTTON_STATE_PRESSED &&
+				server->fps_held_toplevel) {
+			struct shady_vec3 forward;
+			shady_camera_basis(&server->camera, NULL, NULL, &forward);
+			struct shady_toplevel *thrown = server->fps_held_toplevel;
+			const float throw_speed = 2.6f;
+			thrown->physics_vx = forward.x * throw_speed;
+			thrown->physics_vy = forward.y * throw_speed + server->camera.vel_y;
+			thrown->physics_vz = forward.z * throw_speed;
+			thrown->tilt_vx += -forward.y * 1.1f;
+			thrown->tilt_vy += forward.x * 0.7f;
+			thrown->wobble_vx += forward.x * 0.035f;
+			thrown->wobble_vy += forward.y * 0.035f;
+			server->fps_held_toplevel = NULL;
+			shady_render_schedule_all_outputs(server);
+			return;
+		}
+
 		if (event->button == BTN_LEFT &&
 				event->state == WL_POINTER_BUTTON_STATE_PRESSED) {
 			if (server->fps_held_toplevel) {

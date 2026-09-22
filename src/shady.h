@@ -145,8 +145,10 @@ struct shady_toplevel {
 	/* Per-window position on the real world Z axis. 0 = desktop plane. */
 	float z;
 
-	/* Vertical world-space velocity used by optional window gravity. */
+	/* World-space linear velocity used by gravity, throwing and floor sliding. */
+	float physics_vx;
 	float physics_vy;
+	float physics_vz;
 
 	double last_move_x;
 	double last_move_y;

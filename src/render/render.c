@@ -164,6 +164,8 @@ static void update_window_gravity(
 
 		float world_w = tw / logical_h;
 		float world_h = th / logical_h;
+		float center_x = ((float)toplevel->scene_tree->node.x + tw * 0.5f -
+			logical_h * 0.0f) / logical_h;
 		float center_y = 0.5f -
 			((float)toplevel->scene_tree->node.y + th * 0.5f) / logical_h;
 
@@ -183,7 +185,9 @@ static void update_window_gravity(
 		if (projected_half_h < 0.012f) projected_half_h = 0.012f;
 
 		toplevel->physics_vy -= WINDOW_GRAVITY * dt;
+		center_x += toplevel->physics_vx * dt;
 		center_y += toplevel->physics_vy * dt;
+		toplevel->z += toplevel->physics_vz * dt;
 
 		float floor_center_y = FPS_FLOOR_Y + projected_half_h;
 		if (center_y <= floor_center_y) {
@@ -202,16 +206,18 @@ static void update_window_gravity(
 				toplevel->physics_vy = 0.f;
 			}
 
-			/* Contact friction settles residual spin without erasing orientation. */
+			/* Contact friction settles sliding and spin without erasing orientation. */
 			float friction = 1.f - FLOOR_FRICTION * dt;
 			if (friction < 0.f) friction = 0.f;
 			toplevel->tilt_vx *= friction;
 			toplevel->tilt_vy *= friction;
+			toplevel->physics_vx *= friction;
+			toplevel->physics_vz *= friction;
 		}
 
+		int x = (int)(center_x * logical_h - tw * 0.5f);
 		int y = (int)((0.5f - center_y) * logical_h - th * 0.5f);
-		wlr_scene_node_set_position(&toplevel->scene_tree->node,
-			toplevel->scene_tree->node.x, y);
+		wlr_scene_node_set_position(&toplevel->scene_tree->node, x, y);
 	}
 }
 
