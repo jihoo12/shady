@@ -171,18 +171,25 @@ static void update_fps_held_window(
 	toplevel->z = cz;
 
 	/*
-	 * A held window faces the player instead of remaining parallel to the
-	 * desktop XY plane. Keep a little spring freedom so carrying it still
-	 * feels physical rather than welded to the camera.
+	 * Held windows are rigidly oriented toward the FPS camera.
+	 *
+	 * The regular animation loop aggressively springs tilt back toward zero,
+	 * so feeding target values into tilt velocity made camera-facing rotation
+	 * look like another wobble. Write the orientation directly here instead:
+	 * this runs after the FPS camera update and before window animation/render.
+	 *
+	 * math3d applies Y rotation after X. The camera forward vector uses
+	 * (-sin(yaw), sin(pitch), -cos(yaw)), so the panel's +Z normal faces back
+	 * toward the camera with these angles.
 	 */
-	float target_tilt_x = -server->camera.pitch;
-	float target_tilt_y = -server->camera.yaw;
-	while (target_tilt_y > 3.14159265f) target_tilt_y -= 6.28318530f;
-	while (target_tilt_y < -3.14159265f) target_tilt_y += 6.28318530f;
-	toplevel->tilt_vx += (target_tilt_x - toplevel->tilt_x) * 0.18f;
-	toplevel->tilt_vy += (target_tilt_y - toplevel->tilt_y) * 0.18f;
-	toplevel->wobble_vx += forward.x * 0.0025f;
-	toplevel->wobble_vy += forward.y * 0.0025f;
+	toplevel->tilt_x = server->camera.pitch;
+	toplevel->tilt_y = -server->camera.yaw;
+	toplevel->tilt_vx = 0.0f;
+	toplevel->tilt_vy = 0.0f;
+
+	/* Keep flexible wobble subtle while held so rigid rotation reads clearly. */
+	toplevel->wobble_vx += forward.x * 0.00045f;
+	toplevel->wobble_vy += forward.y * 0.00045f;
 }
 
 
@@ -879,7 +886,6 @@ void shady_render_output_frame(
 	fps_last_time = fps_now;
 	fps_clock_ready = true;
 	update_fps_camera(server, fps_dt);
-	update_fps_held_window(server, logical_w, logical_h);
 
 	/* Camera physics changed the view, so rebuild matrices for this frame. */
 	if (server->camera.first_person && fps_dt > 0.f) {
@@ -890,6 +896,12 @@ void shady_render_output_frame(
 	update_window_animations(
 		server
 	);
+
+	/*
+	 * Apply held-window pose after the generic tilt spring. This makes the
+	 * camera-facing orientation authoritative for the current frame.
+	 */
+	update_fps_held_window(server, logical_w, logical_h);
 
 	/*
 	 * Project every mapped window onto the horizontal floor before drawing
