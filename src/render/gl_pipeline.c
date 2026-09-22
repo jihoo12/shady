@@ -66,6 +66,44 @@ static const char *SIDE_FRAG =
 	"    gl_FragColor = vec4(color, u_base_color.a);\n"
 	"}\n";
 
+static const char *SHADOW_VERT =
+	"attribute vec3 a_pos;\n"
+	"uniform mat4 u_vp;\n"
+	"uniform mat4 u_model;\n"
+	"uniform vec2 u_wobble;\n"
+	"varying vec2 v_uv;\n"
+	"void main() {\n"
+	"    vec2 uv = a_pos.xy;\n"
+	"    vec3 pos = a_pos;\n"
+	"    float cx = uv.x - 0.5;\n"
+	"    float cy = uv.y - 0.5;\n"
+	"    float bx = sin(uv.y * 3.14159265);\n"
+	"    float by = sin(uv.x * 3.14159265);\n"
+	"    pos.x += u_wobble.x * bx * (0.75 + 0.25 * cos(cy * 3.14159265));\n"
+	"    pos.y += u_wobble.y * by * (0.75 + 0.25 * cos(cx * 3.14159265));\n"
+	"    pos.x += u_wobble.y * cy * 0.18 * by;\n"
+	"    pos.y += u_wobble.x * cx * 0.18 * bx;\n"
+	"    float ds = sin(uv.x * 3.14159265) * sin(uv.y * 3.14159265);\n"
+	"    pos.z += (u_wobble.x * cy - u_wobble.y * cx) * 0.65 * ds;\n"
+	"    vec3 world = (u_model * vec4(pos, 1.0)).xyz;\n"
+	"    vec3 light = normalize(vec3(-0.45, 0.72, 0.53));\n"
+	"    float t = (-0.618 - world.y) / -light.y;\n"
+	"    vec3 projected = world + light * t;\n"
+	"    projected.y = -0.618;\n"
+	"    gl_Position = u_vp * vec4(projected, 1.0);\n"
+	"    gl_Position.y = -gl_Position.y;\n"
+	"    v_uv = uv;\n"
+	"}\n";
+
+static const char *SHADOW_FRAG =
+	"precision mediump float;\n"
+	"varying vec2 v_uv;\n"
+	"void main() {\n"
+	"    float edge = min(min(v_uv.x, 1.0-v_uv.x), min(v_uv.y, 1.0-v_uv.y));\n"
+	"    float feather = smoothstep(0.0, 0.055, edge);\n"
+	"    gl_FragColor = vec4(0.0, 0.0, 0.0, 0.28 * feather);\n"
+	"}\n";
+
 static const char *FLOOR_VERT =
 	"attribute vec3 a_pos;\n"
 	"uniform mat4 u_vp;\n"
@@ -746,6 +784,15 @@ bool shady_gl_pipeline_init(
 	}
 	pipeline->floor_u_vp = glGetUniformLocation(pipeline->floor_prog, "u_vp");
 
+	pipeline->shadow_prog = link_program(SHADOW_VERT, SHADOW_FRAG, "window shadow");
+	if (!pipeline->shadow_prog) {
+		shady_gl_pipeline_fini(pipeline);
+		return false;
+	}
+	pipeline->shadow_u_vp = glGetUniformLocation(pipeline->shadow_prog, "u_vp");
+	pipeline->shadow_u_model = glGetUniformLocation(pipeline->shadow_prog, "u_model");
+	pipeline->shadow_u_wobble = glGetUniformLocation(pipeline->shadow_prog, "u_wobble");
+
 	wlr_log(
 		WLR_INFO,
 		"GLES2 3D window pipeline ready "
@@ -772,6 +819,10 @@ bool shady_gl_pipeline_init(
 void shady_gl_pipeline_fini(
 	struct shady_gl_pipeline *pipeline
 ) {
+	if (pipeline->shadow_prog) {
+		glDeleteProgram(pipeline->shadow_prog);
+		pipeline->shadow_prog = 0;
+	}
 	if (pipeline->floor_vbo) {
 		glDeleteBuffers(1, &pipeline->floor_vbo);
 		pipeline->floor_vbo = 0;
@@ -1060,6 +1111,37 @@ void shady_gl_pipeline_draw_floor(
 	glDrawArrays(GL_TRIANGLES, 0, pipeline->floor_vertex_count);
 	glDisableVertexAttribArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glUseProgram(0);
+}
+
+void shady_gl_pipeline_draw_shadow(
+	struct shady_gl_pipeline *pipeline,
+	const float vp[16],
+	const float model[16],
+	float wobble_x,
+	float wobble_y
+) {
+	glUseProgram(pipeline->shadow_prog);
+	glUniformMatrix4fv(pipeline->shadow_u_vp, 1, GL_FALSE, vp);
+	glUniformMatrix4fv(pipeline->shadow_u_model, 1, GL_FALSE, model);
+	glUniform2f(pipeline->shadow_u_wobble, wobble_x, wobble_y);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDepthMask(GL_FALSE);
+	glEnable(GL_POLYGON_OFFSET_FILL);
+	glPolygonOffset(-1.0f, -1.0f);
+
+	glBindBuffer(GL_ARRAY_BUFFER, pipeline->mesh_vbo);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void *)0);
+	glEnableVertexAttribArray(0);
+	glDrawArrays(GL_TRIANGLES, 0, pipeline->mesh_vertex_count);
+	glDisableVertexAttribArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	glDisable(GL_POLYGON_OFFSET_FILL);
+	glDepthMask(GL_TRUE);
+	glDisable(GL_BLEND);
 	glUseProgram(0);
 }
 

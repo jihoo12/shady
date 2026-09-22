@@ -56,6 +56,12 @@ struct shady_gl_pipeline {
 	GLint floor_u_vp;
 	GLuint floor_vbo;
 	GLsizei floor_vertex_count;
+
+	/* Projected window silhouettes on the horizontal floor. */
+	GLuint shadow_prog;
+	GLint shadow_u_vp;
+	GLint shadow_u_model;
+	GLint shadow_u_wobble;
 };
 
 bool shady_gl_pipeline_init(
@@ -91,6 +97,14 @@ void shady_gl_pipeline_draw_sides(
 void shady_gl_pipeline_draw_floor(
 	struct shady_gl_pipeline *pipeline,
 	const float vp[16]
+);
+
+void shady_gl_pipeline_draw_shadow(
+	struct shady_gl_pipeline *pipeline,
+	const float vp[16],
+	const float model[16],
+	float wobble_x,
+	float wobble_y
 );
 
 bool shady_gl_pipeline_copy_texture(

@@ -777,7 +777,32 @@ void shady_render_output_frame(
 		server
 	);
 
+	/*
+	 * Project every mapped window onto the horizontal floor before drawing
+	 * the windows themselves. The shadow shader uses the same deformation
+	 * mesh and directional light as the window lighting.
+	 */
 	struct shady_toplevel *toplevel;
+	wl_list_for_each_reverse(toplevel, &server->toplevels, link) {
+		struct wlr_surface *surface = toplevel->xdg_toplevel->base->surface;
+		if (!surface->mapped || toplevel->close_progress >= 0.02f) {
+			continue;
+		}
+		float tw = (float)surface->current.width;
+		float th = (float)surface->current.height;
+		if (tw <= 0.f || th <= 0.f) {
+			continue;
+		}
+		float layout_x = (float)(toplevel->scene_tree->node.x + ox);
+		float layout_y = (float)(toplevel->scene_tree->node.y + oy);
+		float shadow_model[16];
+		shady_window_model(shadow_model, layout_x, layout_y, tw, th,
+			logical_w, logical_h, toplevel->z, toplevel->tilt_x, toplevel->tilt_y);
+		shady_gl_pipeline_draw_shadow(&pipeline, vp, shadow_model,
+			toplevel->wobble_x, toplevel->wobble_y);
+	}
+
+
 
 	wl_list_for_each_reverse(
 		toplevel,
