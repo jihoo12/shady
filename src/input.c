@@ -286,23 +286,33 @@ static void begin_close_animation(
 	}
 
 	/*
-	 * Ignore repeated Alt+F4 presses while the window is already
-	 * disappearing.
+	 * Don't restart the animation while a close attempt is
+	 * already in progress.
 	 */
-	if (toplevel->closing) {
+	if (
+		toplevel->close_state !=
+		SHADY_CLOSE_IDLE
+	) {
 		return;
 	}
 
-	toplevel->closing = true;
-	toplevel->close_sent = false;
-	toplevel->close_progress = 0.0f;
+	toplevel->close_state =
+		SHADY_CLOSE_CRUMPLING;
+
+	toplevel->close_progress =
+		0.0f;
+
+	toplevel->close_wait_time =
+		0.0f;
 
 	/*
-	 * Give the window a small initial kick so the close transition
-	 * blends naturally with the existing wobbly effect.
+	 * Small kick before the crumple starts.
 	 */
-	toplevel->wobble_vx += 0.10f;
-	toplevel->wobble_vy -= 0.07f;
+	toplevel->wobble_vx +=
+		0.10f;
+
+	toplevel->wobble_vy -=
+		0.07f;
 
 	shady_render_schedule_all_outputs(
 		server

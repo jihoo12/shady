@@ -33,6 +33,13 @@ enum shady_cursor_mode {
 	SHADY_CURSOR_CAMERA_PAN,
 };
 
+enum shady_close_state {
+	SHADY_CLOSE_IDLE,
+	SHADY_CLOSE_CRUMPLING,
+	SHADY_CLOSE_WAITING,
+	SHADY_CLOSE_RESTORING,
+};
+
 struct shady_toplevel;
 
 struct shady_server {
@@ -121,9 +128,9 @@ struct shady_toplevel {
 	 *     0.0 = normal window
 	 *     1.0 = fully crumpled
 	 */
-	bool closing;
-	bool close_sent;
+	enum shady_close_state close_state;
 	float close_progress;
+	float close_wait_time;
 };
 
 struct shady_popup {

@@ -44,6 +44,17 @@ static struct timespec wobble_last_time;
  */
 #define CLOSE_ANIMATION_SECONDS 0.42f
 
+/*
+ * After sending the close request, give normally terminating clients
+ * enough time to unmap before starting the reverse animation.
+ */
+#define CLOSE_WAIT_SECONDS 0.25f
+
+/*
+ * Slightly faster than the crumple animation.
+ */
+#define CLOSE_RESTORE_SECONDS 0.32f
+
 static float shader_time_seconds(void) {
 	struct timespec now;
 
@@ -183,17 +194,20 @@ static void update_window_animations(
 			toplevel->wobble_vy =
 				0.0f;
 		}
-
 		/*
-		 * --------------------------------------------------------
-		 * Close animation
-		 * --------------------------------------------------------
-		 */
+		* --------------------------------------------------------
+		* Close animation state machine
+		* --------------------------------------------------------
+		*/
 
-		if (
-			toplevel->closing &&
-			!toplevel->close_sent
-		) {
+		switch (toplevel->close_state) {
+		case SHADY_CLOSE_CRUMPLING:
+			/*
+			* Normal direction:
+			*
+			*     0.0 --------> 1.0
+			*     normal       crumpled
+			*/
 			toplevel->close_progress +=
 				dt /
 				CLOSE_ANIMATION_SECONDS;
@@ -205,19 +219,77 @@ static void update_window_animations(
 				toplevel->close_progress =
 					1.0f;
 
-				/*
-				 * Mark first.
-				 *
-				 * The client may react immediately and cause
-				 * lifecycle callbacks, so don't send this twice.
-				 */
-				toplevel->close_sent =
-					true;
+				toplevel->close_wait_time =
+					0.0f;
 
+				/*
+				* Only now ask the client to close.
+				*
+				* If it immediately exits, xdg_toplevel_unmap()
+				* will remove it before the restore animation
+				* becomes visible.
+				*/
 				wlr_xdg_toplevel_send_close(
 					toplevel->xdg_toplevel
 				);
+
+				toplevel->close_state =
+					SHADY_CLOSE_WAITING;
 			}
+
+			break;
+
+		case SHADY_CLOSE_WAITING:
+			/*
+			* The client has received the close request.
+			*
+			* A normal application will usually unmap during this
+			* period. If it stays mapped, assume that it needs user
+			* interaction and restore the window.
+			*/
+			toplevel->close_wait_time +=
+				dt;
+
+			if (
+				toplevel->close_wait_time >=
+				CLOSE_WAIT_SECONDS
+			) {
+				toplevel->close_state =
+					SHADY_CLOSE_RESTORING;
+			}
+
+			break;
+
+		case SHADY_CLOSE_RESTORING:
+			/*
+			* Reverse the exact same shader animation:
+			*
+			*     1.0 --------> 0.0
+			*     crumpled     normal
+			*/
+			toplevel->close_progress -=
+				dt /
+				CLOSE_RESTORE_SECONDS;
+
+			if (
+				toplevel->close_progress <=
+				0.0f
+			) {
+				toplevel->close_progress =
+					0.0f;
+
+				toplevel->close_wait_time =
+					0.0f;
+
+				toplevel->close_state =
+					SHADY_CLOSE_IDLE;
+			}
+
+			break;
+
+		case SHADY_CLOSE_IDLE:
+		default:
+			break;
 		}
 	}
 }
