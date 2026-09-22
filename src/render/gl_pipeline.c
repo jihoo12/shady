@@ -71,7 +71,7 @@ static const char *FLOOR_VERT =
 	"uniform mat4 u_vp;\n"
 	"varying vec2 v_world;\n"
 	"void main() {\n"
-	"    v_world = a_pos.xy;\n"
+	"    v_world = a_pos.xz;\n"
 	"    gl_Position = u_vp * vec4(a_pos, 1.0);\n"
 	"    gl_Position.y = -gl_Position.y;\n"
 	"}\n";
@@ -466,10 +466,13 @@ static bool create_window_mesh(
 }
 
 static bool create_floor_mesh(struct shady_gl_pipeline *pipeline) {
-	/* Desktop reference plane: XY plane, slightly behind z=0 windows. */
+	/*
+	 * Horizontal XZ ground plane. The desktop origin is centered on-screen,
+	 * so place the ground below it in world Y instead of behind it in Z.
+	 */
 	static const GLfloat v[] = {
-		-6.0f,-6.0f,-0.08f,  6.0f,-6.0f,-0.08f, -6.0f,6.0f,-0.08f,
-		-6.0f, 6.0f,-0.08f,  6.0f,-6.0f,-0.08f,  6.0f,6.0f,-0.08f,
+		-6.0f,-0.62f,-6.0f,  6.0f,-0.62f,-6.0f, -6.0f,-0.62f,6.0f,
+		-6.0f,-0.62f, 6.0f,  6.0f,-0.62f,-6.0f,  6.0f,-0.62f,6.0f,
 	};
 	glGenBuffers(1, &pipeline->floor_vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, pipeline->floor_vbo);
