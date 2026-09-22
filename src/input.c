@@ -350,6 +350,17 @@ static bool handle_keybinding(struct shady_server *server, xkb_keysym_t sym) {
 		server->fps_left = server->fps_right = false;
 		server->fps_jump_queued = false;
 		if (server->fps_input_capture) {
+			/* Recenter immediately as capture begins, not only after motion. */
+			struct wlr_output *output = wlr_output_layout_output_at(
+				server->output_layout, server->cursor->x, server->cursor->y);
+			if (output) {
+				double ox = 0.0, oy = 0.0;
+				wlr_output_layout_output_coords(server->output_layout, output, &ox, &oy);
+				float scale = output->scale > 0.f ? output->scale : 1.f;
+				wlr_cursor_warp(server->cursor, NULL,
+					-ox + ((double)output->width / scale) * 0.5,
+					-oy + ((double)output->height / scale) * 0.5);
+			}
 			wlr_seat_pointer_clear_focus(server->seat);
 		}
 		shady_render_schedule_all_outputs(server);
@@ -622,6 +633,25 @@ void server_cursor_motion(struct wl_listener *listener, void *data) {
 		server->camera.yaw -= (float)event->delta_x * FPS_LOOK_SENS;
 		server->camera.pitch -= (float)event->delta_y * FPS_LOOK_SENS;
 		clamp_camera(&server->camera);
+		/*
+		 * FPS look consumes relative motion, so the wlroots cursor position
+		 * must not be allowed to remain parked at an old screen edge. Keep
+		 * the hidden logical pointer at the center while navigation capture
+		 * is active; when F3 returns control to clients the cursor therefore
+		 * reappears from a useful, predictable position.
+		 */
+		double cx = server->cursor->x, cy = server->cursor->y;
+		struct wlr_output *output =
+			wlr_output_layout_output_at(server->output_layout, cx, cy);
+		if (output) {
+			double ox = 0.0, oy = 0.0;
+			wlr_output_layout_output_coords(server->output_layout, output, &ox, &oy);
+			float scale = output->scale > 0.f ? output->scale : 1.f;
+			double lw = (double)output->width / scale;
+			double lh = (double)output->height / scale;
+			wlr_cursor_warp(server->cursor, NULL,
+				-ox + lw * 0.5, -oy + lh * 0.5);
+		}
 		wlr_seat_pointer_clear_focus(server->seat);
 		shady_render_schedule_all_outputs(server);
 		return;
