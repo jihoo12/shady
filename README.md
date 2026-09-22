@@ -20,15 +20,17 @@ The imported TinyWL example is CC0; see [its license](LICENSES/tinywl-CC0.txt).
 
 - Custom GLES2 3D rendering pipeline for Wayland surfaces
 - Perspective depth and per-window Z positioning
-- Window thickness with directionally lit side faces
-- Flexible 3D wobble/deformation
+- Solid 3D window shells with thickness, lit side faces, and back faces
+- Flexible 3D wobble/deformation with deformation-aware ray picking
 - Persistent per-window 3D rotation
 - Orbit camera with pan and zoom
 - First-person camera with WASD movement, mouse look, gravity, and jumping
-- Center-ray window picking in first-person mode
-- Grab, carry, rotate, and place windows in 3D space
+- Full-shell 3D picking in first-person mode, including front, sides, and back
+- Grab, carry, rotate, place, and throw windows through 3D space
 - Adjustable grab distance with the scroll wheel
+- Optional window gravity with rotation-aware floor contact, bounce, friction, and sliding
 - FPS client-input mode so applications can receive normal keyboard input
+- Automatic cursor recentering while FPS navigation capture is active
 - Horizontal reference floor and projected window shadows
 - Animated crumple-style window closing
 - Compositor-owned close snapshots for applications that show a confirmation dialog
@@ -45,10 +47,20 @@ The imported TinyWL example is CC0; see [its license](LICENSES/tinywl-CC0.txt).
 | Mouse | Look around |
 | Space | Jump |
 | Left click | Grab / release the window at the center of view |
+| Right click while holding | Throw the held window in the view direction |
 | Scroll while holding a window | Move the held window closer / farther away |
-| F3 | Toggle FPS controls / normal client keyboard input |
+| F3 | Toggle FPS navigation capture / normal client input |
+| F4 | Toggle window gravity |
 
 When a held window is released, its 3D position and rotation are preserved.
+Thrown windows carry linear and angular motion through the scene. With window
+gravity enabled, released windows fall onto the floor, bounce on impact, react
+to their current rotation, and lose sliding/spinning energy through friction.
+
+While FPS navigation capture is active, Shady consumes relative mouse motion
+for camera look and keeps the logical cursor centered. Switching back to client
+input with F3 therefore returns the pointer near the center instead of leaving
+it parked at a screen edge.
 
 ### Orbit mode
 
@@ -68,7 +80,8 @@ When a held window is released, its 3D position and rotation are preserved.
 | F1 | Cycle windows |
 
 Pointer interaction in orbit mode is raycast onto the transformed window
-surfaces.
+geometry. Picking follows the wobble-deformed front mesh and the solid 3D shell,
+so interaction remains aligned when a window is tilted or viewed from the side.
 
 ## NixOS development
 
@@ -139,5 +152,9 @@ pkg-config --cflags --libs --static wlroots-0.20
 ## Status
 
 Shady is a research/experimental compositor rather than a production desktop.
-The 3D interaction model is still evolving, and rendering, picking, physics,
-multi-output behavior, and window orientation are active areas of development.
+The 3D interaction model is still evolving. Current experiments include
+deformable window meshes, solid window shells, full 3D picking, first-person
+navigation, throwing, optional gravity, floor collisions, bounce, friction, and
+projected shadows. Rendering accuracy, richer rigid-body collisions,
+multi-output behavior, and interaction polish remain active areas of
+development.
