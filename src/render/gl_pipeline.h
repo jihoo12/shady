@@ -43,6 +43,7 @@ struct shady_gl_pipeline {
 	GLint side_u_model;
 	GLint side_u_light_dir;
 	GLint side_u_base_color;
+	GLint side_u_wobble;
 	GLuint side_vbo;
 	GLsizei side_vertex_count;
 };
@@ -71,7 +72,9 @@ void shady_gl_pipeline_draw_window(
 void shady_gl_pipeline_draw_sides(
 	struct shady_gl_pipeline *pipeline,
 	const float mvp[16],
-	const float model[16]
+	const float model[16],
+	float wobble_x,
+	float wobble_y
 );
 
 bool shady_gl_pipeline_copy_texture(

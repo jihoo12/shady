@@ -32,7 +32,18 @@ static const char *SIDE_VERT =
 	"uniform mat4 u_model;\n"
 	"varying vec3 v_normal;\n"
 	"void main() {\n"
-	"    gl_Position = u_mvp * vec4(a_pos, 1.0);\n"
+	"    vec3 pos = a_pos;\n"
+	"    float bend_x = sin(pos.y * 3.14159265);\n"
+	"    float bend_y = sin(pos.x * 3.14159265);\n"
+	"    float cx = pos.x - 0.5;\n"
+	"    float cy = pos.y - 0.5;\n"
+	"    pos.x += u_wobble.x * bend_x * (0.75 + 0.25 * cos(cy * 3.14159265));\n"
+	"    pos.y += u_wobble.y * bend_y * (0.75 + 0.25 * cos(cx * 3.14159265));\n"
+	"    pos.x += u_wobble.y * cy * 0.18 * bend_y;\n"
+	"    pos.y += u_wobble.x * cx * 0.18 * bend_x;\n"
+	"    float depth_shape = sin(pos.x * 3.14159265) * sin(pos.y * 3.14159265);\n"
+	"    pos.z += (u_wobble.x * cy - u_wobble.y * cx) * 0.65 * depth_shape;\n"
+	"    gl_Position = u_mvp * vec4(pos, 1.0);\n"
 	"    gl_Position.y = -gl_Position.y;\n"
 	"    v_normal = normalize(mat3(u_model) * a_normal);\n"
 	"}\n";
@@ -41,6 +52,7 @@ static const char *SIDE_FRAG =
 	"precision mediump float;\n"
 	"uniform vec3 u_light_dir;\n"
 	"uniform vec4 u_base_color;\n"
+	"uniform vec2 u_wobble;\n"
 	"varying vec3 v_normal;\n"
 	"void main() {\n"
 	"    vec3 n = normalize(v_normal);\n"
@@ -428,9 +440,42 @@ static bool create_window_mesh(
 
 static bool create_side_mesh(struct shady_gl_pipeline *pipeline) {
 	/*
-	 * Four walls of a unit box. Each vertex stores position + face normal.
-	 * Front is z=0 and the back edge is z=-1.
+	 * Four subdivided walls of a unit box. Subdivision lets the perimeter
+	 * follow the same flexible deformation as the front surface.
 	 */
+	const int segments = WOBBLE_MESH_X;
+	const int vertex_count = segments * 4 * 6;
+	GLfloat *v = calloc((size_t)vertex_count * 6, sizeof(GLfloat));
+	if (!v) return false;
+	int n = 0;
+#define SIDE_VERTEX(px,py,pz,nx,ny,nz) do { \
+	v[n++]=(px); v[n++]=(py); v[n++]=(pz); \
+	v[n++]=(nx); v[n++]=(ny); v[n++]=(nz); \
+} while (0)
+#define SIDE_QUAD(x0,y0,z0,x1,y1,z1,x2,y2,z2,x3,y3,z3,nx,ny,nz) do { \
+	SIDE_VERTEX(x0,y0,z0,nx,ny,nz); SIDE_VERTEX(x1,y1,z1,nx,ny,nz); SIDE_VERTEX(x2,y2,z2,nx,ny,nz); \
+	SIDE_VERTEX(x2,y2,z2,nx,ny,nz); SIDE_VERTEX(x1,y1,z1,nx,ny,nz); SIDE_VERTEX(x3,y3,z3,nx,ny,nz); \
+} while (0)
+	for (int i = 0; i < segments; ++i) {
+		float a=(float)i/segments, b=(float)(i+1)/segments;
+		SIDE_QUAD(0,a,0, 0,a,-1, 0,b,0, 0,b,-1, -1,0,0);
+		SIDE_QUAD(1,a,0, 1,b,0, 1,a,-1, 1,b,-1, 1,0,0);
+		SIDE_QUAD(a,0,0, b,0,0, a,0,-1, b,0,-1, 0,-1,0);
+		SIDE_QUAD(a,1,0, a,1,-1, b,1,0, b,1,-1, 0,1,0);
+	}
+#undef SIDE_QUAD
+#undef SIDE_VERTEX
+	glGenBuffers(1, &pipeline->side_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, pipeline->side_vbo);
+	glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(n * sizeof(GLfloat)), v, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	free(v);
+	pipeline->side_vertex_count = vertex_count;
+	return pipeline->side_vbo != 0;
+}
+
+/* old static mesh removed */
+#if 0
 	static const GLfloat v[] = {
 		/* left, normal -X */
 		0,0,0, -1,0,0,  0,1,0, -1,0,0,  0,0,-1, -1,0,0,
@@ -452,6 +497,7 @@ static bool create_side_mesh(struct shady_gl_pipeline *pipeline) {
 	pipeline->side_vertex_count = 24;
 	return pipeline->side_vbo != 0;
 }
+#endif
 
 bool shady_gl_pipeline_init(
 	struct shady_gl_pipeline *pipeline,
@@ -649,6 +695,7 @@ bool shady_gl_pipeline_init(
 	pipeline->side_u_model = glGetUniformLocation(pipeline->side_prog, "u_model");
 	pipeline->side_u_light_dir = glGetUniformLocation(pipeline->side_prog, "u_light_dir");
 	pipeline->side_u_base_color = glGetUniformLocation(pipeline->side_prog, "u_base_color");
+	pipeline->side_u_wobble = glGetUniformLocation(pipeline->side_prog, "u_wobble");
 
 	wlr_log(
 		WLR_INFO,
@@ -911,7 +958,9 @@ void shady_gl_pipeline_draw_window(
 void shady_gl_pipeline_draw_sides(
 	struct shady_gl_pipeline *pipeline,
 	const float mvp[16],
-	const float model[16]
+	const float model[16],
+	float wobble_x,
+	float wobble_y
 ) {
 	glUseProgram(pipeline->side_prog);
 	glUniformMatrix4fv(pipeline->side_u_mvp, 1, GL_FALSE, mvp);
@@ -920,6 +969,7 @@ void shady_gl_pipeline_draw_sides(
 	/* A fixed world-space key light from upper-left and slightly forward. */
 	glUniform3f(pipeline->side_u_light_dir, -0.45f, 0.72f, 0.53f);
 	glUniform4f(pipeline->side_u_base_color, 0.16f, 0.21f, 0.31f, 1.0f);
+	glUniform2f(pipeline->side_u_wobble, wobble_x, wobble_y);
 
 	glDisable(GL_BLEND);
 	glDepthMask(GL_TRUE);

@@ -83,6 +83,19 @@ void main() {
 		bend_x;
 
 	/*
+	 * True 3D flexible-sheet deformation. The same spring impulse that
+	 * bends X/Y now bows the mesh through local Z as well.
+	 */
+	float depth_shape =
+		sin(uv.x * 3.14159265) *
+		sin(uv.y * 3.14159265);
+
+	pos.z +=
+		(u_wobble.x * cy - u_wobble.y * cx) *
+		0.65 *
+		depth_shape;
+
+	/*
 	 * ------------------------------------------------------------
 	 * Close / crumple animation
 	 * ------------------------------------------------------------
