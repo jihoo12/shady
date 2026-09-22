@@ -71,7 +71,7 @@ struct shady_toplevel *shady_toplevel_at_3d(struct shady_server *server,
 
 		float model[16];
 		shady_window_model(model, layout_x, layout_y, tw, th,
-			logical_w, logical_h, toplevel->tilt_x, toplevel->tilt_y);
+			logical_w, logical_h, toplevel->z, toplevel->tilt_x, toplevel->tilt_y);
 
 		float t, u, v;
 		if (!shady_ray_quad_hit(&ray, model, &t, &u, &v)) {

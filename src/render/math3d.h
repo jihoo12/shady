@@ -55,7 +55,7 @@ void shady_camera_eye(const struct shady_camera *cam, struct shady_vec3 *eye);
  */
 void shady_window_model(float model[16],
 	float layout_x, float layout_y, float width_px, float height_px,
-	float output_w, float output_h, float tilt_x, float tilt_y);
+	float output_w, float output_h, float z, float tilt_x, float tilt_y);
 
 /* NDC (x,y in [-1,1], y up) → world ray for this view*proj. */
 void shady_ray_from_ndc(struct shady_ray *ray,

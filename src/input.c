@@ -28,6 +28,9 @@
 #define CAMERA_PITCH_MAX 1.4f
 #define CAMERA_DIST_MIN 0.4f
 #define CAMERA_DIST_MAX 12.0f
+#define WINDOW_Z_STEP 0.055f
+#define WINDOW_Z_MIN -1.5f
+#define WINDOW_Z_MAX 0.75f
 
 void reset_cursor_mode(struct shady_server *server) {
 	server->cursor_mode = SHADY_CURSOR_PASSTHROUGH;
@@ -620,8 +623,29 @@ void server_cursor_axis(struct wl_listener *listener, void *data) {
 		wl_container_of(listener, server, cursor_axis);
 	struct wlr_pointer_axis_event *event = data;
 
+	uint32_t mods = seat_modifiers(server);
+
+	/*
+	 * Alt+Shift+scroll moves the focused window through world Z.
+	 * Scroll up pulls it toward the camera; scroll down pushes it away.
+	 * Alt+scroll remains camera zoom.
+	 */
+	if ((mods & WLR_MODIFIER_ALT)
+			&& (mods & WLR_MODIFIER_SHIFT)
+			&& event->orientation == WL_POINTER_AXIS_VERTICAL_SCROLL) {
+		struct shady_toplevel *toplevel = focused_toplevel(server);
+		if (toplevel) {
+			float direction = event->delta < 0.0 ? 1.0f : -1.0f;
+			toplevel->z += direction * WINDOW_Z_STEP;
+			if (toplevel->z < WINDOW_Z_MIN) toplevel->z = WINDOW_Z_MIN;
+			if (toplevel->z > WINDOW_Z_MAX) toplevel->z = WINDOW_Z_MAX;
+			shady_render_schedule_all_outputs(server);
+		}
+		return;
+	}
+
 	/* Alt+scroll zooms the camera; plain scroll goes to the client. */
-	if ((seat_modifiers(server) & WLR_MODIFIER_ALT)
+	if ((mods & WLR_MODIFIER_ALT)
 			&& event->orientation == WL_POINTER_AXIS_VERTICAL_SCROLL) {
 		server->camera.distance += (float)(event->delta * 0.01);
 		clamp_camera(&server->camera);

@@ -128,6 +128,9 @@ struct shady_toplevel {
 	float tilt_vx;
 	float tilt_vy;
 
+	/* Per-window position on the real world Z axis. 0 = desktop plane. */
+	float z;
+
 	double last_move_x;
 	double last_move_y;
 

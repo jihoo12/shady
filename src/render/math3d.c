@@ -225,7 +225,7 @@ void shady_camera_view(const struct shady_camera *cam, float view[16]) {
 
 void shady_window_model(float model[16],
 		float layout_x, float layout_y, float width_px, float height_px,
-		float output_w, float output_h, float tilt_x, float tilt_y) {
+		float output_w, float output_h, float z, float tilt_x, float tilt_y) {
 	float inv_h = 1.0f / output_h;
 	float bl_x = (layout_x - output_w * 0.5f) * inv_h;
 	float bl_y = (output_h * 0.5f - (layout_y + height_px)) * inv_h;
@@ -239,7 +239,7 @@ void shady_window_model(float model[16],
 	float t[16], pivot[16], unpivot[16], rx[16], ry[16], r[16], s[16];
 	float a[16], b[16], c[16];
 
-	shady_mat4_translate(t, bl_x, bl_y, 0.f);
+	shady_mat4_translate(t, bl_x, bl_y, z);
 	shady_mat4_translate(pivot, sx * 0.5f, sy * 0.5f, 0.f);
 	shady_mat4_translate(unpivot, -0.5f, -0.5f, 0.f);
 	shady_mat4_rotate_x(rx, tilt_x);

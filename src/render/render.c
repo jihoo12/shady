@@ -54,6 +54,7 @@ struct shady_close_snapshot {
 	float height;
 	float tilt_x;
 	float tilt_y;
+	float z;
 
 	bool has_alpha;
 
@@ -883,6 +884,7 @@ void shady_render_output_frame(
 					snapshot->height = th;
 					snapshot->tilt_x = toplevel->tilt_x;
 					snapshot->tilt_y = toplevel->tilt_y;
+					snapshot->z = toplevel->z;
 					snapshot->has_alpha = attribs.has_alpha;
 					snapshot->dirty = false;
 				}
@@ -897,6 +899,7 @@ void shady_render_output_frame(
 			th,
 			logical_w,
 			logical_h,
+			toplevel->z,
 			toplevel->tilt_x,
 			toplevel->tilt_y
 		);
@@ -958,6 +961,7 @@ void shady_render_output_frame(
 			snapshot->height,
 			logical_w,
 			logical_h,
+			snapshot->z,
 			snapshot->tilt_x,
 			snapshot->tilt_y
 		);
