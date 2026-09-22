@@ -103,6 +103,9 @@ struct shady_server {
 
 	/* F3 toggles between navigation and normal client input in FPS mode. */
 	bool fps_input_capture;
+
+	/* Runtime world setting: released windows fall onto the floor when enabled. */
+	bool window_gravity;
 };
 
 struct shady_output {
@@ -141,6 +144,9 @@ struct shady_toplevel {
 
 	/* Per-window position on the real world Z axis. 0 = desktop plane. */
 	float z;
+
+	/* Vertical world-space velocity used by optional window gravity. */
+	float physics_vy;
 
 	double last_move_x;
 	double last_move_y;

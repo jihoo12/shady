@@ -102,6 +102,7 @@ static struct wl_list close_snapshots;
 #define FPS_MOVE_SPEED 1.25f
 #define FPS_GRAVITY 3.8f
 #define FPS_JUMP_SPEED 1.45f
+#define WINDOW_GRAVITY 2.8f
 
 static void update_fps_camera(struct shady_server *server, float dt) {
 	struct shady_camera *cam = &server->camera;
@@ -135,6 +136,51 @@ static void update_fps_camera(struct shady_server *server, float dt) {
 		cam->pos_y = standing_y;
 		cam->vel_y = 0.f;
 		cam->grounded = true;
+	}
+}
+
+static void update_window_gravity(
+	struct shady_server *server, float dt, float logical_h
+) {
+	if (!server->window_gravity || dt <= 0.f || logical_h <= 0.f) return;
+
+	struct shady_toplevel *toplevel;
+	wl_list_for_each(toplevel, &server->toplevels, link) {
+		if (toplevel == server->fps_held_toplevel) {
+			toplevel->physics_vy = 0.f;
+			continue;
+		}
+
+		struct wlr_surface *surface = toplevel->xdg_toplevel->base->surface;
+		if (!surface->mapped) continue;
+
+		float th = (float)surface->current.height;
+		if (th <= 0.f) continue;
+
+		/*
+		 * Scene Y grows downward. Convert the window center to world Y,
+		 * integrate gravity there, then convert back. For this first physics
+		 * pass the floor collision uses the upright window half-height; the
+		 * persistent visual rotation is intentionally left untouched.
+		 */
+		float world_h = th / logical_h;
+		float center_y = 0.5f - ((float)toplevel->scene_tree->node.y + th * 0.5f) / logical_h;
+		toplevel->physics_vy -= WINDOW_GRAVITY * dt;
+		center_y += toplevel->physics_vy * dt;
+
+		float floor_center_y = FPS_FLOOR_Y + world_h * 0.5f;
+		if (center_y <= floor_center_y) {
+			bool landed = toplevel->physics_vy < -0.08f;
+			center_y = floor_center_y;
+			toplevel->physics_vy = 0.f;
+			if (landed) {
+				toplevel->wobble_vy += 0.055f;
+			}
+		}
+
+		int y = (int)((0.5f - center_y) * logical_h - th * 0.5f);
+		wlr_scene_node_set_position(&toplevel->scene_tree->node,
+			toplevel->scene_tree->node.x, y);
 	}
 }
 
@@ -885,6 +931,7 @@ void shady_render_output_frame(
 	fps_last_time = fps_now;
 	fps_clock_ready = true;
 	update_fps_camera(server, fps_dt);
+	update_window_gravity(server, fps_dt, logical_h);
 
 	/* Camera physics changed the view, so rebuild matrices for this frame. */
 	if (server->camera.first_person && fps_dt > 0.f) {

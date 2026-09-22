@@ -334,6 +334,16 @@ static void begin_close_animation(
 }
 
 static bool handle_keybinding(struct shady_server *server, xkb_keysym_t sym) {
+	if (sym == XKB_KEY_F4) {
+		server->window_gravity = !server->window_gravity;
+		struct shady_toplevel *toplevel;
+		wl_list_for_each(toplevel, &server->toplevels, link) {
+			toplevel->physics_vy = 0.0f;
+		}
+		shady_render_schedule_all_outputs(server);
+		return true;
+	}
+
 	if (sym == XKB_KEY_F3 && server->camera.first_person) {
 		server->fps_input_capture = !server->fps_input_capture;
 		server->fps_forward = server->fps_back = false;
@@ -474,7 +484,8 @@ static void keyboard_handle_key(
 	/* F2 changes camera mode; F3 releases/captures FPS controls for typing. */
 	if (event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
 		for (int j = 0; j < nsyms; j++) {
-			if (syms[j] == XKB_KEY_F2 || syms[j] == XKB_KEY_F3)
+			if (syms[j] == XKB_KEY_F2 || syms[j] == XKB_KEY_F3 ||
+					syms[j] == XKB_KEY_F4)
 				handled = handle_keybinding(server, syms[j]);
 		}
 	}
