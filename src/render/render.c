@@ -332,21 +332,20 @@ static void update_window_animations(
 			toplevel->wobble_vy =
 				0.0f;
 		}
-		/* Rigid-body tilt spring. */
-		const float TILT_SPRING = 55.0f;
+		/*
+		 * Rigid-body tilt inertia.
+		 *
+		 * Rotation is now a persistent part of a window's 3D transform:
+		 * releasing a window damps angular velocity, but does not spring the
+		 * orientation back to the desktop XY plane.
+		 */
 		const float TILT_DAMPING = 9.0f;
-		toplevel->tilt_vx += -toplevel->tilt_x * TILT_SPRING * dt;
-		toplevel->tilt_vy += -toplevel->tilt_y * TILT_SPRING * dt;
 		float tilt_damping = 1.0f - TILT_DAMPING * dt;
 		if (tilt_damping < 0.0f) tilt_damping = 0.0f;
 		toplevel->tilt_vx *= tilt_damping;
 		toplevel->tilt_vy *= tilt_damping;
 		toplevel->tilt_x += toplevel->tilt_vx * dt;
 		toplevel->tilt_y += toplevel->tilt_vy * dt;
-		if (toplevel->tilt_x > 0.28f) toplevel->tilt_x = 0.28f;
-		if (toplevel->tilt_x < -0.28f) toplevel->tilt_x = -0.28f;
-		if (toplevel->tilt_y > 0.28f) toplevel->tilt_y = 0.28f;
-		if (toplevel->tilt_y < -0.28f) toplevel->tilt_y = -0.28f;
 
 		/*
 		* --------------------------------------------------------
