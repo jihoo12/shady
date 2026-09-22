@@ -74,7 +74,8 @@ struct shady_toplevel *shady_toplevel_at_3d(struct shady_server *server,
 			logical_w, logical_h, toplevel->z, toplevel->tilt_x, toplevel->tilt_y);
 
 		float t, u, v;
-		if (!shady_ray_quad_hit(&ray, model, &t, &u, &v)) {
+		if (!shady_ray_wobble_hit(&ray, model, toplevel->wobble_x,
+				toplevel->wobble_y, &t, &u, &v)) {
 			continue;
 		}
 		if (t < best_t) {
@@ -147,7 +148,8 @@ struct shady_toplevel *shady_toplevel_at_camera_center(
 			tw, th, logical_w, logical_h, toplevel->z,
 			toplevel->tilt_x, toplevel->tilt_y);
 		float t, u, v;
-		if (shady_ray_quad_hit(&ray, model, &t, &u, &v) && t < best_t) {
+		if (shady_ray_wobble_hit(&ray, model, toplevel->wobble_x,
+				toplevel->wobble_y, &t, &u, &v) && t < best_t) {
 			best_t = t;
 			best = toplevel;
 		}

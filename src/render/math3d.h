@@ -74,4 +74,8 @@ void shady_ray_from_ndc(struct shady_ray *ray,
 bool shady_ray_quad_hit(const struct shady_ray *ray, const float model[16],
 	float *t_out, float *u_out, float *v_out);
 
+/* Ray vs the same 16x16 wobble-deformed front mesh used by the renderer. */
+bool shady_ray_wobble_hit(const struct shady_ray *ray, const float model[16],
+	float wobble_x, float wobble_y, float *t_out, float *u_out, float *v_out);
+
 #endif

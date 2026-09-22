@@ -409,3 +409,47 @@ bool shady_ray_quad_hit(const struct shady_ray *ray, const float model[16],
 	*v_out = best_v;
 	return true;
 }
+
+static struct shady_vec3 wobble_front_point(const float model[16],
+		float u, float v, float wx, float wy) {
+	const float pi = 3.14159265f;
+	float cx = u - 0.5f, cy = v - 0.5f;
+	float bend_x = sinf(v * pi), bend_y = sinf(u * pi);
+	float x = u + wx * bend_x * (0.75f + 0.25f * cosf(cy * pi))
+		+ wy * cy * 0.18f * bend_y;
+	float y = v + wy * bend_y * (0.75f + 0.25f * cosf(cx * pi))
+		+ wx * cx * 0.18f * bend_x;
+	float depth = sinf(u * pi) * sinf(v * pi);
+	float z = (wx * cy - wy * cx) * 0.65f * depth;
+	return transform_point(model, x, y, z);
+}
+
+bool shady_ray_wobble_hit(const struct shady_ray *ray, const float model[16],
+		float wx, float wy, float *t_out, float *u_out, float *v_out) {
+	const int n = 16;
+	bool hit = false;
+	float best_t = 1e30f, best_u = 0.f, best_v = 0.f;
+	for (int y = 0; y < n; ++y) {
+		for (int x = 0; x < n; ++x) {
+			float u0 = (float)x / n, u1 = (float)(x + 1) / n;
+			float v0 = (float)y / n, v1 = (float)(y + 1) / n;
+			struct shady_vec3 p00 = wobble_front_point(model, u0, v0, wx, wy);
+			struct shady_vec3 p10 = wobble_front_point(model, u1, v0, wx, wy);
+			struct shady_vec3 p01 = wobble_front_point(model, u0, v1, wx, wy);
+			struct shady_vec3 p11 = wobble_front_point(model, u1, v1, wx, wy);
+			float t, bu, bv;
+			if (ray_triangle(ray, p00, p10, p01, &t, &bu, &bv) && t < best_t) {
+				best_t=t; best_u=u0+(u1-u0)*bu; best_v=v0+(v1-v0)*bv; hit=true;
+			}
+			if (ray_triangle(ray, p10, p11, p01, &t, &bu, &bv) && t < best_t) {
+				best_t=t;
+				best_u=u1-(u1-u0)*bv;
+				best_v=v0+(v1-v0)*(bu+bv);
+				hit=true;
+			}
+		}
+	}
+	if (!hit) return false;
+	*t_out=best_t; *u_out=best_u; *v_out=best_v;
+	return true;
+}
