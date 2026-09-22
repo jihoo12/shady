@@ -272,16 +272,6 @@ static void update_window_animations(
 
 				toplevel->close_state =
 					SHADY_CLOSE_WAITING;
-				
-				struct shady_close_snapshot *snapshot =
-					ensure_close_snapshot(
-						toplevel
-					);
-
-				if (snapshot) {
-					snapshot->dirty =
-						true;
-}
 			}
 
 			break;
@@ -832,18 +822,6 @@ void shady_render_output_frame(
 		float model[16];
 		float mvp[16];
 
-
-
-		shady_window_model(
-			model,
-			layout_x,
-			layout_y,
-			tw,
-			th,
-			logical_w,
-			logical_h
-		);
-
 		if (
 			toplevel->close_state ==
 			SHADY_CLOSE_ARMED
@@ -869,106 +847,37 @@ void shady_render_output_frame(
 						&new_texture
 					)
 				) {
-					if (
-						snapshot->texture
-					) {
+					if (snapshot->texture) {
 						glDeleteTextures(
 							1,
 							&snapshot->texture
 						);
 					}
 
-					snapshot->texture =
-						new_texture;
-
-					snapshot->texture_width =
-						texture->width;
-
-					snapshot->texture_height =
-						texture->height;
-
+					snapshot->texture = new_texture;
+					snapshot->texture_width = texture->width;
+					snapshot->texture_height = texture->height;
 					snapshot->x =
-						(float)
-						toplevel
-							->scene_tree
-							->node
-							.x;
-
+						(float)toplevel->scene_tree->node.x;
 					snapshot->y =
-						(float)
-						toplevel
-							->scene_tree
-							->node
-							.y;
-
-					snapshot->width =
-						tw;
-
-					snapshot->height =
-						th;
-
-					snapshot->has_alpha =
-						attribs.has_alpha;
-
-					snapshot->dirty =
-						false;
+						(float)toplevel->scene_tree->node.y;
+					snapshot->width = tw;
+					snapshot->height = th;
+					snapshot->has_alpha = attribs.has_alpha;
+					snapshot->dirty = false;
 				}
 			}
-
-		struct shady_close_snapshot *snapshot;
-
-		wl_list_for_each(
-			snapshot,
-			&close_snapshots,
-			link
-		) {
-			if (
-				!snapshot->animating ||
-				!snapshot->texture ||
-				snapshot->server != server
-			) {
-				continue;
-			}
-
-			float layout_x =
-				snapshot->x +
-				(float)ox;
-
-			float layout_y =
-				snapshot->y +
-				(float)oy;
-
-			float model[16];
-			float mvp[16];
-
-			shady_window_model(
-				model,
-				layout_x,
-				layout_y,
-				snapshot->width,
-				snapshot->height,
-				logical_w,
-				logical_h
-			);
-
-			shady_mat4_multiply(
-				mvp,
-				vp,
-				model
-			);
-
-			shady_gl_pipeline_draw_window(
-				&pipeline,
-				GL_TEXTURE_2D,
-				snapshot->texture,
-				snapshot->has_alpha,
-				mvp,
-				time_seconds,
-				0.0f,
-				0.0f,
-				snapshot->progress
-			);
 		}
+
+		shady_window_model(
+			model,
+			layout_x,
+			layout_y,
+			tw,
+			th,
+			logical_w,
+			logical_h
+		);
 
 		shady_mat4_multiply(
 			mvp,
@@ -986,6 +895,61 @@ void shady_render_output_frame(
 			toplevel->wobble_x,
 			toplevel->wobble_y,
 			toplevel->close_progress
+		);
+	}
+
+	struct shady_close_snapshot *snapshot;
+
+	wl_list_for_each(
+		snapshot,
+		&close_snapshots,
+		link
+	) {
+		if (
+			!snapshot->animating ||
+			!snapshot->texture ||
+			snapshot->server != server
+		) {
+			continue;
+		}
+
+		float layout_x =
+			snapshot->x +
+			(float)ox;
+
+		float layout_y =
+			snapshot->y +
+			(float)oy;
+
+		float model[16];
+		float mvp[16];
+
+		shady_window_model(
+			model,
+			layout_x,
+			layout_y,
+			snapshot->width,
+			snapshot->height,
+			logical_w,
+			logical_h
+		);
+
+		shady_mat4_multiply(
+			mvp,
+			vp,
+			model
+		);
+
+		shady_gl_pipeline_draw_window(
+			&pipeline,
+			GL_TEXTURE_2D,
+			snapshot->texture,
+			snapshot->has_alpha,
+			mvp,
+			time_seconds,
+			0.0f,
+			0.0f,
+			snapshot->progress
 		);
 	}
 

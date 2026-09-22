@@ -122,10 +122,11 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 
 static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 	(void)data;
+	struct shady_toplevel *toplevel = wl_container_of(listener, toplevel, destroy);
+
 	shady_render_toplevel_destroy(
 		toplevel
 	);
-	struct shady_toplevel *toplevel = wl_container_of(listener, toplevel, destroy);
 
 	wl_list_remove(&toplevel->map.link);
 	wl_list_remove(&toplevel->unmap.link);
