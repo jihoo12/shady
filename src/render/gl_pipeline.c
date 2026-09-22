@@ -66,6 +66,32 @@ static const char *SIDE_FRAG =
 	"    gl_FragColor = vec4(color, u_base_color.a);\n"
 	"}\n";
 
+static const char *FLOOR_VERT =
+	"attribute vec3 a_pos;\n"
+	"uniform mat4 u_vp;\n"
+	"varying vec2 v_world;\n"
+	"void main() {\n"
+	"    v_world = a_pos.xy;\n"
+	"    gl_Position = u_vp * vec4(a_pos, 1.0);\n"
+	"    gl_Position.y = -gl_Position.y;\n"
+	"}\n";
+
+static const char *FLOOR_FRAG =
+	"#extension GL_OES_standard_derivatives : enable\n"
+	"precision mediump float;\n"
+	"varying vec2 v_world;\n"
+	"void main() {\n"
+	"    vec2 g = abs(fract(v_world * 10.0 - 0.5) - 0.5) / max(fwidth(v_world * 10.0), vec2(0.0001));\n"
+	"    float line = 1.0 - min(min(g.x, g.y), 1.0);\n"
+	"    vec2 major_g = abs(fract(v_world * 2.0 - 0.5) - 0.5) / max(fwidth(v_world * 2.0), vec2(0.0001));\n"
+	"    float major = 1.0 - min(min(major_g.x, major_g.y), 1.0);\n"
+	"    float fade = 1.0 - smoothstep(1.5, 5.5, length(v_world));\n"
+	"    vec3 base = vec3(0.035, 0.045, 0.070);\n"
+	"    vec3 grid = vec3(0.08, 0.22, 0.34) * line * 0.42;\n"
+	"    grid += vec3(0.10, 0.32, 0.50) * major * 0.34;\n"
+	"    gl_FragColor = vec4(base + grid * fade, 1.0);\n"
+	"}\n";
+
 static const char *COPY_VERT =
 	"attribute vec3 a_pos;\n"
 	"varying vec2 v_uv;\n"
@@ -439,6 +465,20 @@ static bool create_window_mesh(
 	return pipeline->mesh_vbo != 0;
 }
 
+static bool create_floor_mesh(struct shady_gl_pipeline *pipeline) {
+	/* Desktop reference plane: XY plane, slightly behind z=0 windows. */
+	static const GLfloat v[] = {
+		-6.0f,-6.0f,-0.08f,  6.0f,-6.0f,-0.08f, -6.0f,6.0f,-0.08f,
+		-6.0f, 6.0f,-0.08f,  6.0f,-6.0f,-0.08f,  6.0f,6.0f,-0.08f,
+	};
+	glGenBuffers(1, &pipeline->floor_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, pipeline->floor_vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(v), v, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	pipeline->floor_vertex_count = 6;
+	return pipeline->floor_vbo != 0;
+}
+
 static bool create_side_mesh(struct shady_gl_pipeline *pipeline) {
 	/*
 	 * Four subdivided walls of a unit box. Subdivision lets the perimeter
@@ -696,6 +736,13 @@ bool shady_gl_pipeline_init(
 	pipeline->side_u_base_color = glGetUniformLocation(pipeline->side_prog, "u_base_color");
 	pipeline->side_u_wobble = glGetUniformLocation(pipeline->side_prog, "u_wobble");
 
+	pipeline->floor_prog = link_program(FLOOR_VERT, FLOOR_FRAG, "3D floor");
+	if (!pipeline->floor_prog || !create_floor_mesh(pipeline)) {
+		shady_gl_pipeline_fini(pipeline);
+		return false;
+	}
+	pipeline->floor_u_vp = glGetUniformLocation(pipeline->floor_prog, "u_vp");
+
 	wlr_log(
 		WLR_INFO,
 		"GLES2 3D window pipeline ready "
@@ -722,6 +769,15 @@ bool shady_gl_pipeline_init(
 void shady_gl_pipeline_fini(
 	struct shady_gl_pipeline *pipeline
 ) {
+	if (pipeline->floor_vbo) {
+		glDeleteBuffers(1, &pipeline->floor_vbo);
+		pipeline->floor_vbo = 0;
+		pipeline->floor_vertex_count = 0;
+	}
+	if (pipeline->floor_prog) {
+		glDeleteProgram(pipeline->floor_prog);
+		pipeline->floor_prog = 0;
+	}
 	if (pipeline->side_vbo) {
 		glDeleteBuffers(1, &pipeline->side_vbo);
 		pipeline->side_vbo = 0;
@@ -982,6 +1038,23 @@ void shady_gl_pipeline_draw_sides(
 	glDrawArrays(GL_TRIANGLES, 0, pipeline->side_vertex_count);
 
 	glDisableVertexAttribArray(1);
+	glDisableVertexAttribArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glUseProgram(0);
+}
+
+void shady_gl_pipeline_draw_floor(
+	struct shady_gl_pipeline *pipeline,
+	const float vp[16]
+) {
+	glUseProgram(pipeline->floor_prog);
+	glUniformMatrix4fv(pipeline->floor_u_vp, 1, GL_FALSE, vp);
+	glDisable(GL_BLEND);
+	glDepthMask(GL_TRUE);
+	glBindBuffer(GL_ARRAY_BUFFER, pipeline->floor_vbo);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void *)0);
+	glEnableVertexAttribArray(0);
+	glDrawArrays(GL_TRIANGLES, 0, pipeline->floor_vertex_count);
 	glDisableVertexAttribArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glUseProgram(0);

@@ -50,6 +50,12 @@ struct shady_gl_pipeline {
 	GLint side_u_wobble;
 	GLuint side_vbo;
 	GLsizei side_vertex_count;
+
+	/* World-space reference plane and perspective grid. */
+	GLuint floor_prog;
+	GLint floor_u_vp;
+	GLuint floor_vbo;
+	GLsizei floor_vertex_count;
 };
 
 bool shady_gl_pipeline_init(
@@ -80,6 +86,11 @@ void shady_gl_pipeline_draw_sides(
 	const float model[16],
 	float wobble_x,
 	float wobble_y
+);
+
+void shady_gl_pipeline_draw_floor(
+	struct shady_gl_pipeline *pipeline,
+	const float vp[16]
 );
 
 bool shady_gl_pipeline_copy_texture(
