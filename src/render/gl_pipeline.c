@@ -603,10 +603,9 @@ bool shady_gl_pipeline_init(
 		);
 
 	pipeline->u_close_progress_2d =
-		glGetUniformLocation(
-			pipeline->prog_2d,
-			"u_close_progress"
-		);
+		glGetUniformLocation(pipeline->prog_2d, "u_close_progress");
+	pipeline->u_model_2d = glGetUniformLocation(pipeline->prog_2d, "u_model");
+	pipeline->u_light_dir_2d = glGetUniformLocation(pipeline->prog_2d, "u_light_dir");
 
 	/*
 	 * EGL external texture uniforms.
@@ -648,10 +647,9 @@ bool shady_gl_pipeline_init(
 		);
 
 	pipeline->u_close_progress_ext =
-		glGetUniformLocation(
-			pipeline->prog_ext,
-			"u_close_progress"
-		);
+		glGetUniformLocation(pipeline->prog_ext, "u_close_progress");
+	pipeline->u_model_ext = glGetUniformLocation(pipeline->prog_ext, "u_model");
+	pipeline->u_light_dir_ext = glGetUniformLocation(pipeline->prog_ext, "u_light_dir");
 
 	pipeline->copy_prog_2d =
 	link_program(
@@ -781,6 +779,7 @@ void shady_gl_pipeline_draw_window(
 	GLuint tex,
 	bool has_alpha,
 	const float mvp[16],
+	const float model[16],
 	float time_seconds,
 	float wobble_x,
 	float wobble_y,
@@ -824,19 +823,15 @@ void shady_gl_pipeline_draw_window(
 			? pipeline->u_wobble_ext
 			: pipeline->u_wobble_2d;
 
-	GLint u_close_progress =
-		external
-			? pipeline->u_close_progress_ext
-			: pipeline->u_close_progress_2d;
+	GLint u_close_progress = external ? pipeline->u_close_progress_ext : pipeline->u_close_progress_2d;
+	GLint u_model = external ? pipeline->u_model_ext : pipeline->u_model_2d;
+	GLint u_light_dir = external ? pipeline->u_light_dir_ext : pipeline->u_light_dir_2d;
 
 	glUseProgram(prog);
 
-	glUniformMatrix4fv(
-		u_mvp,
-		1,
-		GL_FALSE,
-		mvp
-	);
+	glUniformMatrix4fv(u_mvp, 1, GL_FALSE, mvp);
+	glUniformMatrix4fv(u_model, 1, GL_FALSE, model);
+	glUniform3f(u_light_dir, -0.45f, 0.72f, 0.53f);
 
 	glUniform4fv(
 		u_tint,

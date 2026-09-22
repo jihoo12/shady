@@ -17,6 +17,8 @@ struct shady_gl_pipeline {
 	GLint u_time_2d;
 	GLint u_wobble_2d;
 	GLint u_close_progress_2d;
+	GLint u_model_2d;
+	GLint u_light_dir_2d;
 
 	GLint u_mvp_ext;
 	GLint u_tex_ext;
@@ -25,6 +27,8 @@ struct shady_gl_pipeline {
 	GLint u_time_ext;
 	GLint u_wobble_ext;
 	GLint u_close_progress_ext;
+	GLint u_model_ext;
+	GLint u_light_dir_ext;
 
 	/*
 	 * Subdivided mesh used for wobbly and crumple deformation.
@@ -63,6 +67,7 @@ void shady_gl_pipeline_draw_window(
 	GLuint tex,
 	bool has_alpha,
 	const float mvp[16],
+	const float model[16],
 	float time_seconds,
 	float wobble_x,
 	float wobble_y,

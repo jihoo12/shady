@@ -5,8 +5,10 @@ uniform samplerExternalOES u_tex;
 uniform vec4 u_tint;
 uniform float u_has_alpha;
 uniform float u_time;
+uniform vec3 u_light_dir;
 
 varying vec2 v_uv;
+varying vec3 v_normal;
 
 void main() {
 	vec2 uv = v_uv;
@@ -72,6 +74,16 @@ void main() {
 	color.rgb *= scan;
 
 	color *= u_tint;
+
+	/* Light follows the normal of the deformed 3D sheet. */
+	vec3 n = normalize(v_normal);
+	vec3 l = normalize(u_light_dir);
+	float diffuse = max(dot(n, l), 0.0);
+	float facing = clamp(abs(n.z), 0.0, 1.0);
+	float surface_light = 0.86 + diffuse * 0.14;
+	float grazing = (1.0 - facing) * 0.055;
+	color.rgb *= surface_light;
+	color.rgb += vec3(0.08, 0.16, 0.28) * grazing;
 
 	gl_FragColor = color;
 }

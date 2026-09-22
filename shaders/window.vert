@@ -1,6 +1,7 @@
 attribute vec3 a_pos;
 
 uniform mat4 u_mvp;
+uniform mat4 u_model;
 
 uniform vec2 u_wobble;
 
@@ -11,6 +12,7 @@ uniform vec2 u_wobble;
 uniform float u_close_progress;
 
 varying vec2 v_uv;
+varying vec3 v_normal;
 
 void main() {
 	vec2 uv = a_pos.xy;
@@ -279,6 +281,24 @@ void main() {
 		p *
 		p *
 		0.08;
+
+	/*
+	 * Reconstruct the deformed surface normal from the same local
+	 * deformation function using small finite differences. This keeps
+	 * lighting attached to the actual wobbly/crumpled sheet.
+	 */
+	float eps = 0.0025;
+	vec2 ux = clamp(uv + vec2(eps, 0.0), 0.0, 1.0);
+	vec2 uy = clamp(uv + vec2(0.0, eps), 0.0, 1.0);
+	float zx = (u_wobble.x * (ux.y - 0.5) - u_wobble.y * (ux.x - 0.5)) *
+		0.65 * sin(ux.x * 3.14159265) * sin(ux.y * 3.14159265);
+	float zy = (u_wobble.x * (uy.y - 0.5) - u_wobble.y * (uy.x - 0.5)) *
+		0.65 * sin(uy.x * 3.14159265) * sin(uy.y * 3.14159265);
+	float z0 = (u_wobble.x * cy - u_wobble.y * cx) * 0.65 * depth_shape;
+	vec3 tangent_x = vec3(eps, 0.0, zx - z0);
+	vec3 tangent_y = vec3(0.0, eps, zy - z0);
+	vec3 local_normal = normalize(cross(tangent_x, tangent_y));
+	v_normal = normalize(mat3(u_model) * local_normal);
 
 	gl_Position =
 		u_mvp *
