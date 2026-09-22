@@ -144,6 +144,10 @@ static void update_window_gravity(
 ) {
 	if (!server->window_gravity || dt <= 0.f || logical_h <= 0.f) return;
 
+	const float FLOOR_RESTITUTION = 0.22f;
+	const float FLOOR_FRICTION = 7.0f;
+	const float ANGULAR_KICK = 0.22f;
+
 	struct shady_toplevel *toplevel;
 	wl_list_for_each(toplevel, &server->toplevels, link) {
 		if (toplevel == server->fps_held_toplevel) {
@@ -154,28 +158,55 @@ static void update_window_gravity(
 		struct wlr_surface *surface = toplevel->xdg_toplevel->base->surface;
 		if (!surface->mapped) continue;
 
+		float tw = (float)surface->current.width;
 		float th = (float)surface->current.height;
-		if (th <= 0.f) continue;
+		if (tw <= 0.f || th <= 0.f) continue;
+
+		float world_w = tw / logical_h;
+		float world_h = th / logical_h;
+		float center_y = 0.5f -
+			((float)toplevel->scene_tree->node.y + th * 0.5f) / logical_h;
 
 		/*
-		 * Scene Y grows downward. Convert the window center to world Y,
-		 * integrate gravity there, then convert back. For this first physics
-		 * pass the floor collision uses the upright window half-height; the
-		 * persistent visual rotation is intentionally left untouched.
+		 * The lowest point of a rectangle rotated by tilt_x/tilt_y can be
+		 * approximated from the projected half extents. Y rotation makes the
+		 * horizontal span contribute to vertical support after the X rotation,
+		 * which is enough to make tilted windows contact on an edge/corner
+		 * instead of sinking to the old upright height.
 		 */
-		float world_h = th / logical_h;
-		float center_y = 0.5f - ((float)toplevel->scene_tree->node.y + th * 0.5f) / logical_h;
+		float sx = sinf(toplevel->tilt_x);
+		float cx = cosf(toplevel->tilt_x);
+		float sy = sinf(toplevel->tilt_y);
+		float projected_half_h =
+			fabsf(cx) * world_h * 0.5f +
+			fabsf(sx * sy) * world_w * 0.5f;
+		if (projected_half_h < 0.012f) projected_half_h = 0.012f;
+
 		toplevel->physics_vy -= WINDOW_GRAVITY * dt;
 		center_y += toplevel->physics_vy * dt;
 
-		float floor_center_y = FPS_FLOOR_Y + world_h * 0.5f;
+		float floor_center_y = FPS_FLOOR_Y + projected_half_h;
 		if (center_y <= floor_center_y) {
-			bool landed = toplevel->physics_vy < -0.08f;
+			float impact = -toplevel->physics_vy;
 			center_y = floor_center_y;
-			toplevel->physics_vy = 0.f;
-			if (landed) {
-				toplevel->wobble_vy += 0.055f;
+
+			if (impact > 0.12f) {
+				/* A real landing bounces, twists, and excites the flexible body. */
+				toplevel->physics_vy = impact * FLOOR_RESTITUTION;
+				float side = (sinf(toplevel->tilt_y) >= 0.f) ? 1.f : -1.f;
+				toplevel->tilt_vx += side * impact * ANGULAR_KICK;
+				toplevel->tilt_vy -= sinf(toplevel->tilt_x) * impact * ANGULAR_KICK;
+				toplevel->wobble_vx += side * impact * 0.018f;
+				toplevel->wobble_vy += impact * 0.035f;
+			} else {
+				toplevel->physics_vy = 0.f;
 			}
+
+			/* Contact friction settles residual spin without erasing orientation. */
+			float friction = 1.f - FLOOR_FRICTION * dt;
+			if (friction < 0.f) friction = 0.f;
+			toplevel->tilt_vx *= friction;
+			toplevel->tilt_vy *= friction;
 		}
 
 		int y = (int)((0.5f - center_y) * logical_h - th * 0.5f);
