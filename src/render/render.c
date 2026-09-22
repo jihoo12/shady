@@ -182,8 +182,8 @@ static void update_fps_held_window(
 	 * (-sin(yaw), sin(pitch), -cos(yaw)), so the panel's +Z normal faces back
 	 * toward the camera with these angles.
 	 */
-	toplevel->tilt_x = server->camera.pitch;
-	toplevel->tilt_y = -server->camera.yaw;
+	toplevel->tilt_x = -server->camera.pitch;
+	toplevel->tilt_y = server->camera.yaw;
 	toplevel->tilt_vx = 0.0f;
 	toplevel->tilt_vy = 0.0f;
 
