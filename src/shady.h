@@ -122,6 +122,12 @@ struct shady_toplevel {
 	float wobble_vx;
 	float wobble_vy;
 
+	/* Rigid-body 3D tilt, independent from the flexible shader wobble. */
+	float tilt_x;
+	float tilt_y;
+	float tilt_vx;
+	float tilt_vy;
+
 	double last_move_x;
 	double last_move_y;
 

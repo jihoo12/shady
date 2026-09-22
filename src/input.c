@@ -101,6 +101,18 @@ static void process_cursor_move(struct shady_server *server) {
 		(float)dy * 0.0065f;
 
 	/*
+	 * A second, much smaller impulse rotates the whole window as a rigid
+	 * body. Horizontal motion turns around Y; vertical motion turns around X.
+	 */
+	toplevel->tilt_vy += (float)dx * 0.00055f;
+	toplevel->tilt_vx -= (float)dy * 0.00055f;
+
+	if (toplevel->tilt_vx > 0.55f) toplevel->tilt_vx = 0.55f;
+	if (toplevel->tilt_vx < -0.55f) toplevel->tilt_vx = -0.55f;
+	if (toplevel->tilt_vy > 0.55f) toplevel->tilt_vy = 0.55f;
+	if (toplevel->tilt_vy < -0.55f) toplevel->tilt_vy = -0.55f;
+
+	/*
 	 * Prevent ridiculous deformation if the pointer jumps a large
 	 * distance in a single event.
 	 */

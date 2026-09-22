@@ -140,6 +140,26 @@ void shady_mat4_scale(float out[16], float x, float y, float z) {
 	out[10] = z;
 }
 
+void shady_mat4_rotate_x(float out[16], float radians) {
+	float c = cosf(radians);
+	float s = sinf(radians);
+	shady_mat4_identity(out);
+	out[5] = c;
+	out[6] = s;
+	out[9] = -s;
+	out[10] = c;
+}
+
+void shady_mat4_rotate_y(float out[16], float radians) {
+	float c = cosf(radians);
+	float s = sinf(radians);
+	shady_mat4_identity(out);
+	out[0] = c;
+	out[2] = -s;
+	out[8] = s;
+	out[10] = c;
+}
+
 void shady_camera_eye(const struct shady_camera *cam, struct shady_vec3 *eye) {
 	float cp = cosf(cam->pitch);
 	float sp = sinf(cam->pitch);
@@ -205,18 +225,32 @@ void shady_camera_view(const struct shady_camera *cam, float view[16]) {
 
 void shady_window_model(float model[16],
 		float layout_x, float layout_y, float width_px, float height_px,
-		float output_w, float output_h) {
+		float output_w, float output_h, float tilt_x, float tilt_y) {
 	float inv_h = 1.0f / output_h;
-	/* Bottom-left of the window in world (+Y up). Local +Y goes up. */
 	float bl_x = (layout_x - output_w * 0.5f) * inv_h;
 	float bl_y = (output_h * 0.5f - (layout_y + height_px)) * inv_h;
 	float sx = width_px * inv_h;
 	float sy = height_px * inv_h;
 
-	float t[16], s[16];
+	/*
+	 * Rotate around the visual centre of the front face. Z scale is a
+	 * constant world-space thickness (~14 logical pixels at 1080p).
+	 */
+	float t[16], pivot[16], unpivot[16], rx[16], ry[16], r[16], s[16];
+	float a[16], b[16], c[16];
+
 	shady_mat4_translate(t, bl_x, bl_y, 0.f);
-	shady_mat4_scale(s, sx, sy, 1.f);
-	shady_mat4_multiply(model, t, s);
+	shady_mat4_translate(pivot, sx * 0.5f, sy * 0.5f, 0.f);
+	shady_mat4_translate(unpivot, -0.5f, -0.5f, 0.f);
+	shady_mat4_rotate_x(rx, tilt_x);
+	shady_mat4_rotate_y(ry, tilt_y);
+	shady_mat4_multiply(r, ry, rx);
+	shady_mat4_scale(s, sx, sy, 14.0f * inv_h);
+
+	shady_mat4_multiply(a, t, pivot);
+	shady_mat4_multiply(b, a, r);
+	shady_mat4_multiply(c, b, s);
+	shady_mat4_multiply(model, c, unpivot);
 }
 
 static void mat4_mul_vec4(const float m[16], const float v[4], float out[4]) {

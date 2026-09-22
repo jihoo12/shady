@@ -52,6 +52,8 @@ struct shady_close_snapshot {
 	float y;
 	float width;
 	float height;
+	float tilt_x;
+	float tilt_y;
 
 	bool has_alpha;
 
@@ -231,6 +233,22 @@ static void update_window_animations(
 			toplevel->wobble_vy =
 				0.0f;
 		}
+		/* Rigid-body tilt spring. */
+		const float TILT_SPRING = 55.0f;
+		const float TILT_DAMPING = 9.0f;
+		toplevel->tilt_vx += -toplevel->tilt_x * TILT_SPRING * dt;
+		toplevel->tilt_vy += -toplevel->tilt_y * TILT_SPRING * dt;
+		float tilt_damping = 1.0f - TILT_DAMPING * dt;
+		if (tilt_damping < 0.0f) tilt_damping = 0.0f;
+		toplevel->tilt_vx *= tilt_damping;
+		toplevel->tilt_vy *= tilt_damping;
+		toplevel->tilt_x += toplevel->tilt_vx * dt;
+		toplevel->tilt_y += toplevel->tilt_vy * dt;
+		if (toplevel->tilt_x > 0.28f) toplevel->tilt_x = 0.28f;
+		if (toplevel->tilt_x < -0.28f) toplevel->tilt_x = -0.28f;
+		if (toplevel->tilt_y > 0.28f) toplevel->tilt_y = 0.28f;
+		if (toplevel->tilt_y < -0.28f) toplevel->tilt_y = -0.28f;
+
 		/*
 		* --------------------------------------------------------
 		* Close animation state machine
@@ -863,6 +881,8 @@ void shady_render_output_frame(
 						(float)toplevel->scene_tree->node.y;
 					snapshot->width = tw;
 					snapshot->height = th;
+					snapshot->tilt_x = toplevel->tilt_x;
+					snapshot->tilt_y = toplevel->tilt_y;
 					snapshot->has_alpha = attribs.has_alpha;
 					snapshot->dirty = false;
 				}
@@ -876,7 +896,9 @@ void shady_render_output_frame(
 			tw,
 			th,
 			logical_w,
-			logical_h
+			logical_h,
+			toplevel->tilt_x,
+			toplevel->tilt_y
 		);
 
 		shady_mat4_multiply(
@@ -884,6 +906,10 @@ void shady_render_output_frame(
 			vp,
 			model
 		);
+
+		if (toplevel->close_progress < 0.02f) {
+			shady_gl_pipeline_draw_sides(&pipeline, mvp);
+		}
 
 		shady_gl_pipeline_draw_window(
 			&pipeline,
@@ -931,7 +957,9 @@ void shady_render_output_frame(
 			snapshot->width,
 			snapshot->height,
 			logical_w,
-			logical_h
+			logical_h,
+			snapshot->tilt_x,
+			snapshot->tilt_y
 		);
 
 		shady_mat4_multiply(
@@ -939,6 +967,10 @@ void shady_render_output_frame(
 			vp,
 			model
 		);
+
+		if (snapshot->progress < 0.02f) {
+			shady_gl_pipeline_draw_sides(&pipeline, mvp);
+		}
 
 		shady_gl_pipeline_draw_window(
 			&pipeline,

@@ -25,6 +25,19 @@ static const float WINDOW_TINT[4] = {
 #define WOBBLE_MESH_X 16
 #define WOBBLE_MESH_Y 16
 
+static const char *SIDE_VERT =
+	"attribute vec3 a_pos;\n"
+	"uniform mat4 u_mvp;\n"
+	"void main() {\n"
+	"    gl_Position = u_mvp * vec4(a_pos, 1.0);\n"
+	"    gl_Position.y = -gl_Position.y;\n"
+	"}\n";
+
+static const char *SIDE_FRAG =
+	"precision mediump float;\n"
+	"uniform vec4 u_color;\n"
+	"void main() { gl_FragColor = u_color; }\n";
+
 static const char *COPY_VERT =
 	"attribute vec3 a_pos;\n"
 	"varying vec2 v_uv;\n"
@@ -393,6 +406,22 @@ static bool create_window_mesh(
 	return pipeline->mesh_vbo != 0;
 }
 
+static bool create_side_mesh(struct shady_gl_pipeline *pipeline) {
+	/* Four walls of a unit box. Front is z=0, back edge is z=-1. */
+	static const GLfloat v[] = {
+		/* left */   0,0,0,  0,1,0,  0,0,-1,  0,0,-1,  0,1,0,  0,1,-1,
+		/* right */  1,0,0,  1,0,-1, 1,1,0,   1,0,-1, 1,1,-1, 1,1,0,
+		/* bottom */ 0,0,0,  0,0,-1, 1,0,0,   1,0,0,  0,0,-1, 1,0,-1,
+		/* top */    0,1,0,  1,1,0,  0,1,-1,  0,1,-1, 1,1,0,  1,1,-1,
+	};
+	glGenBuffers(1, &pipeline->side_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, pipeline->side_vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(v), v, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	pipeline->side_vertex_count = 24;
+	return pipeline->side_vbo != 0;
+}
+
 bool shady_gl_pipeline_init(
 	struct shady_gl_pipeline *pipeline,
 	struct wlr_renderer *renderer
@@ -580,6 +609,14 @@ bool shady_gl_pipeline_init(
 			"u_tex"
 		);
 
+	pipeline->side_prog = link_program(SIDE_VERT, SIDE_FRAG, "window sides");
+	if (!pipeline->side_prog || !create_side_mesh(pipeline)) {
+		shady_gl_pipeline_fini(pipeline);
+		return false;
+	}
+	pipeline->side_u_mvp = glGetUniformLocation(pipeline->side_prog, "u_mvp");
+	pipeline->side_u_color = glGetUniformLocation(pipeline->side_prog, "u_color");
+
 	wlr_log(
 		WLR_INFO,
 		"GLES2 3D window pipeline ready "
@@ -606,6 +643,15 @@ bool shady_gl_pipeline_init(
 void shady_gl_pipeline_fini(
 	struct shady_gl_pipeline *pipeline
 ) {
+	if (pipeline->side_vbo) {
+		glDeleteBuffers(1, &pipeline->side_vbo);
+		pipeline->side_vbo = 0;
+		pipeline->side_vertex_count = 0;
+	}
+	if (pipeline->side_prog) {
+		glDeleteProgram(pipeline->side_prog);
+		pipeline->side_prog = 0;
+	}
 	if (pipeline->mesh_vbo) {
 		glDeleteBuffers(
 			1,
@@ -826,6 +872,25 @@ void shady_gl_pipeline_draw_window(
 		0
 	);
 
+	glUseProgram(0);
+}
+
+void shady_gl_pipeline_draw_sides(
+	struct shady_gl_pipeline *pipeline,
+	const float mvp[16]
+) {
+	glUseProgram(pipeline->side_prog);
+	glUniformMatrix4fv(pipeline->side_u_mvp, 1, GL_FALSE, mvp);
+	glUniform4f(pipeline->side_u_color, 0.075f, 0.09f, 0.14f, 1.0f);
+
+	glDisable(GL_BLEND);
+	glDepthMask(GL_TRUE);
+	glBindBuffer(GL_ARRAY_BUFFER, pipeline->side_vbo);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(GLfloat), (void *)0);
+	glEnableVertexAttribArray(0);
+	glDrawArrays(GL_TRIANGLES, 0, pipeline->side_vertex_count);
+	glDisableVertexAttribArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glUseProgram(0);
 }
 
