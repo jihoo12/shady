@@ -31,6 +31,11 @@ struct shady_gl_pipeline {
 	 */
 	GLuint mesh_vbo;
 	GLsizei mesh_vertex_count;
+	GLuint copy_prog_2d;
+	GLuint copy_prog_ext;
+
+	GLint copy_tex_2d;
+	GLint copy_tex_ext;
 };
 
 bool shady_gl_pipeline_init(
@@ -52,6 +57,15 @@ void shady_gl_pipeline_draw_window(
 	float wobble_x,
 	float wobble_y,
 	float close_progress
+);
+
+bool shady_gl_pipeline_copy_texture(
+	struct shady_gl_pipeline *pipeline,
+	GLenum source_target,
+	GLuint source_texture,
+	int width,
+	int height,
+	GLuint *out_texture
 );
 
 #endif

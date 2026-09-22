@@ -25,6 +25,36 @@ static const float WINDOW_TINT[4] = {
 #define WOBBLE_MESH_X 16
 #define WOBBLE_MESH_Y 16
 
+static const char *COPY_VERT =
+	"attribute vec3 a_pos;\n"
+	"varying vec2 v_uv;\n"
+	"void main() {\n"
+	"    v_uv = a_pos.xy;\n"
+	"    gl_Position = vec4(\n"
+	"        a_pos.x * 2.0 - 1.0,\n"
+	"        a_pos.y * 2.0 - 1.0,\n"
+	"        0.0,\n"
+	"        1.0\n"
+	"    );\n"
+	"}\n";
+
+static const char *COPY_FRAG_2D =
+	"precision mediump float;\n"
+	"uniform sampler2D u_tex;\n"
+	"varying vec2 v_uv;\n"
+	"void main() {\n"
+	"    gl_FragColor = texture2D(u_tex, v_uv);\n"
+	"}\n";
+
+static const char *COPY_FRAG_EXT =
+	"#extension GL_OES_EGL_image_external : require\n"
+	"precision mediump float;\n"
+	"uniform samplerExternalOES u_tex;\n"
+	"varying vec2 v_uv;\n"
+	"void main() {\n"
+	"    gl_FragColor = texture2D(u_tex, v_uv);\n"
+	"}\n";
+
 static char *read_shader_file(const char *name) {
 	char path[512];
 
@@ -516,6 +546,40 @@ bool shady_gl_pipeline_init(
 			"u_close_progress"
 		);
 
+	pipeline->copy_prog_2d =
+	link_program(
+		COPY_VERT,
+		COPY_FRAG_2D,
+		"snapshot copy 2D"
+	);
+
+	pipeline->copy_prog_ext =
+		link_program(
+			COPY_VERT,
+			COPY_FRAG_EXT,
+			"snapshot copy external"
+		);
+
+	if (
+		!pipeline->copy_prog_2d ||
+		!pipeline->copy_prog_ext
+	) {
+		shady_gl_pipeline_fini(pipeline);
+		return false;
+	}
+
+	pipeline->copy_tex_2d =
+		glGetUniformLocation(
+			pipeline->copy_prog_2d,
+			"u_tex"
+		);
+
+	pipeline->copy_tex_ext =
+		glGetUniformLocation(
+			pipeline->copy_prog_ext,
+			"u_tex"
+		);
+
 	wlr_log(
 		WLR_INFO,
 		"GLES2 3D window pipeline ready "
@@ -565,6 +629,22 @@ void shady_gl_pipeline_fini(
 		);
 
 		pipeline->prog_ext = 0;
+	}
+
+	if (pipeline->copy_prog_2d) {
+		glDeleteProgram(
+			pipeline->copy_prog_2d
+		);
+
+		pipeline->copy_prog_2d = 0;
+	}
+
+	if (pipeline->copy_prog_ext) {
+		glDeleteProgram(
+			pipeline->copy_prog_ext
+		);
+
+		pipeline->copy_prog_ext = 0;
 	}
 }
 
@@ -748,3 +828,230 @@ void shady_gl_pipeline_draw_window(
 
 	glUseProgram(0);
 }
+
+bool shady_gl_pipeline_copy_texture(
+	struct shady_gl_pipeline *pipeline,
+	GLenum source_target,
+	GLuint source_texture,
+	int width,
+	int height,
+	GLuint *out_texture
+) {
+	if (
+		width <= 0 ||
+		height <= 0 ||
+		!out_texture
+	) {
+		return false;
+	}
+
+	GLint old_fbo = 0;
+	GLint old_viewport[4];
+
+	glGetIntegerv(
+		GL_FRAMEBUFFER_BINDING,
+		&old_fbo
+	);
+
+	glGetIntegerv(
+		GL_VIEWPORT,
+		old_viewport
+	);
+
+	GLuint texture = 0;
+	GLuint fbo = 0;
+
+	glGenTextures(
+		1,
+		&texture
+	);
+
+	glBindTexture(
+		GL_TEXTURE_2D,
+		texture
+	);
+
+	glTexParameteri(
+		GL_TEXTURE_2D,
+		GL_TEXTURE_MIN_FILTER,
+		GL_LINEAR
+	);
+
+	glTexParameteri(
+		GL_TEXTURE_2D,
+		GL_TEXTURE_MAG_FILTER,
+		GL_LINEAR
+	);
+
+	glTexParameteri(
+		GL_TEXTURE_2D,
+		GL_TEXTURE_WRAP_S,
+		GL_CLAMP_TO_EDGE
+	);
+
+	glTexParameteri(
+		GL_TEXTURE_2D,
+		GL_TEXTURE_WRAP_T,
+		GL_CLAMP_TO_EDGE
+	);
+
+	glTexImage2D(
+		GL_TEXTURE_2D,
+		0,
+		GL_RGBA,
+		width,
+		height,
+		0,
+		GL_RGBA,
+		GL_UNSIGNED_BYTE,
+		NULL
+	);
+
+	glGenFramebuffers(
+		1,
+		&fbo
+	);
+
+	glBindFramebuffer(
+		GL_FRAMEBUFFER,
+		fbo
+	);
+
+	glFramebufferTexture2D(
+		GL_FRAMEBUFFER,
+		GL_COLOR_ATTACHMENT0,
+		GL_TEXTURE_2D,
+		texture,
+		0
+	);
+
+	if (
+		glCheckFramebufferStatus(
+			GL_FRAMEBUFFER
+		) != GL_FRAMEBUFFER_COMPLETE
+	) {
+		glBindFramebuffer(
+			GL_FRAMEBUFFER,
+			(GLuint)old_fbo
+		);
+
+		glDeleteFramebuffers(
+			1,
+			&fbo
+		);
+
+		glDeleteTextures(
+			1,
+			&texture
+		);
+
+		return false;
+	}
+
+	glViewport(
+		0,
+		0,
+		width,
+		height
+	);
+
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_BLEND);
+
+	bool external =
+		source_target ==
+		GL_TEXTURE_EXTERNAL_OES;
+
+	GLuint program =
+		external
+			? pipeline->copy_prog_ext
+			: pipeline->copy_prog_2d;
+
+	GLint u_tex =
+		external
+			? pipeline->copy_tex_ext
+			: pipeline->copy_tex_2d;
+
+	glUseProgram(
+		program
+	);
+
+	glUniform1i(
+		u_tex,
+		0
+	);
+
+	glActiveTexture(
+		GL_TEXTURE0
+	);
+
+	glBindTexture(
+		source_target,
+		source_texture
+	);
+
+	glBindBuffer(
+		GL_ARRAY_BUFFER,
+		pipeline->mesh_vbo
+	);
+
+	glVertexAttribPointer(
+		0,
+		3,
+		GL_FLOAT,
+		GL_FALSE,
+		3 * sizeof(GLfloat),
+		(void *)0
+	);
+
+	glEnableVertexAttribArray(
+		0
+	);
+
+	glDrawArrays(
+		GL_TRIANGLES,
+		0,
+		pipeline->mesh_vertex_count
+	);
+
+	glDisableVertexAttribArray(
+		0
+	);
+
+	glBindBuffer(
+		GL_ARRAY_BUFFER,
+		0
+	);
+
+	glBindTexture(
+		source_target,
+		0
+	);
+
+	glUseProgram(
+		0
+	);
+
+	glBindFramebuffer(
+		GL_FRAMEBUFFER,
+		(GLuint)old_fbo
+	);
+
+	glViewport(
+		old_viewport[0],
+		old_viewport[1],
+		old_viewport[2],
+		old_viewport[3]
+	);
+
+	glDeleteFramebuffers(
+		1,
+		&fbo
+	);
+
+	*out_texture =
+		texture;
+
+	return true;
+}
+

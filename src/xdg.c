@@ -10,6 +10,7 @@
 #include <wlr/util/edges.h>
 
 #include "shady.h"
+#include "render/render.h"
 
 void focus_toplevel(struct shady_toplevel *toplevel) {
 	if (toplevel == NULL) {
@@ -100,7 +101,9 @@ static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 	if (toplevel == toplevel->server->grabbed_toplevel) {
 		reset_cursor_mode(toplevel->server);
 	}
-
+	shady_render_toplevel_unmap(
+		toplevel
+	);
 	wl_list_remove(&toplevel->link);
 }
 
@@ -111,10 +114,17 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 	if (toplevel->xdg_toplevel->base->initial_commit) {
 		wlr_xdg_toplevel_set_size(toplevel->xdg_toplevel, 0, 0);
 	}
+
+	shady_render_toplevel_commit(
+		toplevel
+	);
 }
 
 static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 	(void)data;
+	shady_render_toplevel_destroy(
+		toplevel
+	);
 	struct shady_toplevel *toplevel = wl_container_of(listener, toplevel, destroy);
 
 	wl_list_remove(&toplevel->map.link);

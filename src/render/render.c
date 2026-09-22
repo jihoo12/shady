@@ -2,6 +2,7 @@
 
 #include <time.h>
 #include <math.h>
+#include <stdlib.h>
 
 #include <wayland-server-core.h>
 
@@ -35,6 +36,42 @@ static int depth_rbo_h;
  */
 static struct timespec shader_start_time;
 static struct timespec wobble_last_time;
+
+struct shady_close_snapshot {
+	struct wl_list link;
+
+	struct shady_toplevel *toplevel;
+	struct shady_server *server;
+
+	GLuint texture;
+
+	int texture_width;
+	int texture_height;
+
+	float x;
+	float y;
+	float width;
+	float height;
+
+	bool has_alpha;
+
+	bool dirty;
+	bool animating;
+
+	float progress;
+};
+
+static struct shady_close_snapshot *
+find_close_snapshot(
+	struct shady_toplevel *toplevel
+);
+
+static struct shady_close_snapshot *
+ensure_close_snapshot(
+	struct shady_toplevel *toplevel
+);
+
+static struct wl_list close_snapshots;
 
 /*
  * Total close animation duration.
@@ -235,6 +272,16 @@ static void update_window_animations(
 
 				toplevel->close_state =
 					SHADY_CLOSE_WAITING;
+				
+				struct shady_close_snapshot *snapshot =
+					ensure_close_snapshot(
+						toplevel
+					);
+
+				if (snapshot) {
+					snapshot->dirty =
+						true;
+}
 			}
 
 			break;
@@ -286,7 +333,6 @@ static void update_window_animations(
 			}
 
 			break;
-		case SHADY_CLOSE_IDLE:
 		case SHADY_CLOSE_ARMED:
 			/*
 			* The window is completely normal and interactive here.
@@ -296,10 +342,112 @@ static void update_window_animations(
 			* that snapshot becomes the exit animation ghost.
 			*/
 			break;
+		case SHADY_CLOSE_IDLE:
 		default:
 			break;
 		}
 	}
+	struct shady_close_snapshot *snapshot;
+	struct shady_close_snapshot *tmp;
+
+	wl_list_for_each_safe(
+		snapshot,
+		tmp,
+		&close_snapshots,
+		link
+	) {
+		if (!snapshot->animating) {
+			continue;
+		}
+
+		snapshot->progress +=
+			dt /
+			CLOSE_ANIMATION_SECONDS;
+
+		if (
+			snapshot->progress >=
+			1.0f
+		) {
+			if (
+				snapshot->texture
+			) {
+				glDeleteTextures(
+					1,
+					&snapshot->texture
+				);
+			}
+
+			wl_list_remove(
+				&snapshot->link
+			);
+
+			free(
+				snapshot
+			);
+		}
+	}
+}
+
+static struct shady_close_snapshot *
+find_close_snapshot(
+	struct shady_toplevel *toplevel
+) {
+	struct shady_close_snapshot *snapshot;
+
+	wl_list_for_each(
+		snapshot,
+		&close_snapshots,
+		link
+	) {
+		if (
+			snapshot->toplevel ==
+			toplevel
+		) {
+			return snapshot;
+		}
+	}
+
+	return NULL;
+}
+
+static struct shady_close_snapshot *
+ensure_close_snapshot(
+	struct shady_toplevel *toplevel
+) {
+	struct shady_close_snapshot *snapshot =
+		find_close_snapshot(
+			toplevel
+		);
+
+	if (snapshot) {
+		return snapshot;
+	}
+
+	snapshot =
+		calloc(
+			1,
+			sizeof(*snapshot)
+		);
+
+	if (!snapshot) {
+		return NULL;
+	}
+
+	snapshot->toplevel =
+		toplevel;
+
+	snapshot->server =
+		toplevel->server;
+
+	snapshot->dirty =
+		true;
+
+	wl_list_insert(
+		&close_snapshots,
+		&snapshot->link
+	);
+
+	return snapshot;
 }
 
 bool shady_render_init(
@@ -322,6 +470,10 @@ bool shady_render_init(
 
 	wobble_last_time =
 		shader_start_time;
+
+	wl_list_init(
+		&close_snapshots
+	);
 
 	return pipeline_ready;
 }
@@ -448,6 +600,7 @@ static void send_frame_done_surface(
 		data
 	);
 }
+
 
 void shady_render_output_frame(
 	struct shady_output *output
@@ -679,6 +832,8 @@ void shady_render_output_frame(
 		float model[16];
 		float mvp[16];
 
+
+
 		shady_window_model(
 			model,
 			layout_x,
@@ -688,6 +843,132 @@ void shady_render_output_frame(
 			logical_w,
 			logical_h
 		);
+
+		if (
+			toplevel->close_state ==
+			SHADY_CLOSE_ARMED
+		) {
+			struct shady_close_snapshot *snapshot =
+				ensure_close_snapshot(
+					toplevel
+				);
+
+			if (
+				snapshot &&
+				snapshot->dirty
+			) {
+				GLuint new_texture = 0;
+
+				if (
+					shady_gl_pipeline_copy_texture(
+						&pipeline,
+						attribs.target,
+						attribs.tex,
+						texture->width,
+						texture->height,
+						&new_texture
+					)
+				) {
+					if (
+						snapshot->texture
+					) {
+						glDeleteTextures(
+							1,
+							&snapshot->texture
+						);
+					}
+
+					snapshot->texture =
+						new_texture;
+
+					snapshot->texture_width =
+						texture->width;
+
+					snapshot->texture_height =
+						texture->height;
+
+					snapshot->x =
+						(float)
+						toplevel
+							->scene_tree
+							->node
+							.x;
+
+					snapshot->y =
+						(float)
+						toplevel
+							->scene_tree
+							->node
+							.y;
+
+					snapshot->width =
+						tw;
+
+					snapshot->height =
+						th;
+
+					snapshot->has_alpha =
+						attribs.has_alpha;
+
+					snapshot->dirty =
+						false;
+				}
+			}
+
+		struct shady_close_snapshot *snapshot;
+
+		wl_list_for_each(
+			snapshot,
+			&close_snapshots,
+			link
+		) {
+			if (
+				!snapshot->animating ||
+				!snapshot->texture ||
+				snapshot->server != server
+			) {
+				continue;
+			}
+
+			float layout_x =
+				snapshot->x +
+				(float)ox;
+
+			float layout_y =
+				snapshot->y +
+				(float)oy;
+
+			float model[16];
+			float mvp[16];
+
+			shady_window_model(
+				model,
+				layout_x,
+				layout_y,
+				snapshot->width,
+				snapshot->height,
+				logical_w,
+				logical_h
+			);
+
+			shady_mat4_multiply(
+				mvp,
+				vp,
+				model
+			);
+
+			shady_gl_pipeline_draw_window(
+				&pipeline,
+				GL_TEXTURE_2D,
+				snapshot->texture,
+				snapshot->has_alpha,
+				mvp,
+				time_seconds,
+				0.0f,
+				0.0f,
+				snapshot->progress
+			);
+		}
 
 		shady_mat4_multiply(
 			mvp,
@@ -771,4 +1052,116 @@ void shady_render_output_frame(
 	wlr_output_schedule_frame(
 		wlr_output
 	);
+}
+
+
+
+void shady_render_toplevel_commit(
+	struct shady_toplevel *toplevel
+) {
+	if (
+		toplevel->close_state !=
+		SHADY_CLOSE_ARMED
+	) {
+		return;
+	}
+
+	struct shady_close_snapshot *snapshot =
+		ensure_close_snapshot(
+			toplevel
+		);
+
+	if (!snapshot) {
+		return;
+	}
+
+	snapshot->dirty =
+		true;
+
+	shady_render_schedule_all_outputs(
+		toplevel->server
+	);
+}
+
+void shady_render_toplevel_unmap(
+	struct shady_toplevel *toplevel
+) {
+	struct shady_close_snapshot *snapshot =
+		find_close_snapshot(
+			toplevel
+		);
+
+	if (
+		!snapshot ||
+		!snapshot->texture ||
+		toplevel->close_state !=
+			SHADY_CLOSE_ARMED
+	) {
+		return;
+	}
+
+	/*
+	 * The client surface is going away.
+	 *
+	 * From this point onward the ghost owns everything it needs
+	 * and must never dereference the toplevel again.
+	 */
+	snapshot->toplevel =
+		NULL;
+
+	snapshot->dirty =
+		false;
+
+	snapshot->animating =
+		true;
+
+	snapshot->progress =
+		0.0f;
+
+	shady_render_schedule_all_outputs(
+		snapshot->server
+	);
+}
+
+void shady_render_toplevel_destroy(
+	struct shady_toplevel *toplevel
+) {
+	struct shady_close_snapshot *snapshot =
+		find_close_snapshot(
+			toplevel
+	);
+
+	if (!snapshot) {
+		return;
+	}
+
+	/*
+	 * If unmap already converted it into a ghost,
+	 * find_close_snapshot() cannot find it because its toplevel
+	 * pointer is NULL.
+	 *
+	 * Otherwise detach it so no dangling pointer remains.
+	 */
+	snapshot->toplevel =
+		NULL;
+
+	if (snapshot->texture) {
+		snapshot->animating =
+			true;
+
+		snapshot->progress =
+			0.0f;
+
+		shady_render_schedule_all_outputs(
+			snapshot->server
+		);
+	} else {
+		wl_list_remove(
+			&snapshot->link
+		);
+
+		free(
+			snapshot
+		);
+	}
 }
