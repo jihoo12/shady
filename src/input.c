@@ -285,13 +285,9 @@ static void begin_close_animation(
 		return;
 	}
 
-	/*
-	 * Don't restart the animation while a close attempt is
-	 * already in progress.
-	 */
 	if (
-		toplevel->close_state !=
-		SHADY_CLOSE_IDLE
+		toplevel->close_state != SHADY_CLOSE_IDLE &&
+		toplevel->close_state != SHADY_CLOSE_ARMED
 	) {
 		return;
 	}

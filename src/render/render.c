@@ -282,12 +282,20 @@ static void update_window_animations(
 					0.0f;
 
 				toplevel->close_state =
-					SHADY_CLOSE_IDLE;
+					SHADY_CLOSE_ARMED;
 			}
 
 			break;
-
 		case SHADY_CLOSE_IDLE:
+		case SHADY_CLOSE_ARMED:
+			/*
+			* The window is completely normal and interactive here.
+			*
+			* Later, the renderer will keep a compositor-owned snapshot
+			* while this state is active. If the client actually unmaps,
+			* that snapshot becomes the exit animation ghost.
+			*/
+			break;
 		default:
 			break;
 		}

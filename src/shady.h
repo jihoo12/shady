@@ -38,6 +38,15 @@ enum shady_close_state {
 	SHADY_CLOSE_CRUMPLING,
 	SHADY_CLOSE_WAITING,
 	SHADY_CLOSE_RESTORING,
+
+	/*
+	 * The client survived the close request.
+	 *
+	 * The window is fully restored and interactive, but if it
+	 * eventually unmaps we want to play the real exit animation
+	 * from a compositor-owned snapshot.
+	 */
+	SHADY_CLOSE_ARMED,
 };
 
 struct shady_toplevel;
