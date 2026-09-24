@@ -21,6 +21,7 @@
 #include "render/render.h"
 #include "modules/physics/physics.h"
 #include "modules/fps/fps.h"
+#include "modules/close_animation/close_animation.h"
 
 #define CAMERA_ORBIT_SENS 0.005f
 #define CAMERA_PAN_SENS 0.0025f
@@ -291,50 +292,6 @@ static struct shady_toplevel *focused_toplevel(
 	return NULL;
 }
 
-static void begin_close_animation(
-	struct shady_server *server
-) {
-	struct shady_toplevel *toplevel =
-		focused_toplevel(server);
-
-	if (!toplevel) {
-		return;
-	}
-	if (!server->config.close_animation) {
-		wlr_xdg_toplevel_send_close(toplevel->xdg_toplevel);
-		return;
-	}
-
-	if (
-		toplevel->close_state != SHADY_CLOSE_IDLE &&
-		toplevel->close_state != SHADY_CLOSE_ARMED
-	) {
-		return;
-	}
-
-	toplevel->close_state =
-		SHADY_CLOSE_CRUMPLING;
-
-	toplevel->close_progress =
-		0.0f;
-
-	toplevel->close_wait_time =
-		0.0f;
-
-	/*
-	 * Small kick before the crumple starts.
-	 */
-	toplevel->wobble_vx +=
-		0.10f;
-
-	toplevel->wobble_vy -=
-		0.07f;
-
-	shady_render_schedule_all_outputs(
-		server
-	);
-}
-
 static bool bind_matches(const struct shady_keybind *bind,
 		xkb_keysym_t sym, uint32_t modifiers) {
 	const uint32_t mask = WLR_MODIFIER_ALT | WLR_MODIFIER_SHIFT |
@@ -358,7 +315,7 @@ static bool handle_keybinding(struct shady_server *server,
 		if (wl_list_length(&server->toplevels)>=2) { struct shady_toplevel *next=wl_container_of(server->toplevels.prev,next,link); focus_toplevel(next); }
 		return true;
 	}
-	if (bind_matches(&c->bind_close_window,sym,modifiers)) { begin_close_animation(server); return true; }
+	if (bind_matches(&c->bind_close_window,sym,modifiers)) { shady_close_animation_begin(server); return true; }
 	bool changed=false; struct shady_vec3 right,up,forward;
 	if (bind_matches(&c->bind_camera_left,sym,modifiers) || bind_matches(&c->bind_camera_right,sym,modifiers) ||
 		bind_matches(&c->bind_camera_up,sym,modifiers) || bind_matches(&c->bind_camera_down,sym,modifiers)) {

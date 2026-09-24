@@ -26,6 +26,7 @@
 #include "../modules/physics/physics.h"
 #include "../modules/fps/fps.h"
 #include "../modules/window_motion/window_motion.h"
+#include "../modules/close_animation/close_animation.h"
 
 static struct shady_gl_pipeline pipeline;
 static bool pipeline_ready;
@@ -87,19 +88,6 @@ static struct wl_list close_snapshots;
  * 0.42 seconds feels quick enough for a window manager while still
  * making the effect clearly visible.
  */
-#define CLOSE_ANIMATION_SECONDS 0.42f
-
-/*
- * After sending the close request, give normally terminating clients
- * enough time to unmap before starting the reverse animation.
- */
-#define CLOSE_WAIT_SECONDS 0.25f
-
-/*
- * Slightly faster than the crumple animation.
- */
-#define CLOSE_RESTORE_SECONDS 0.32f
-
 #define FPS_FLOOR_Y -0.62f
 #define FPS_EYE_HEIGHT 0.40f
 #define FPS_MOVE_SPEED 1.25f
@@ -171,151 +159,9 @@ static void update_window_animations(
 	) {
 		shady_window_motion_update_toplevel(server, toplevel, dt);
 
-		/*
-		* --------------------------------------------------------
-		* Close animation state machine
-		* --------------------------------------------------------
-		*/
-
-		switch (toplevel->close_state) {
-		case SHADY_CLOSE_CRUMPLING:
-			/*
-			* Normal direction:
-			*
-			*     0.0 --------> 1.0
-			*     normal       crumpled
-			*/
-			toplevel->close_progress +=
-				dt /
-				CLOSE_ANIMATION_SECONDS;
-
-			if (
-				toplevel->close_progress >=
-				1.0f
-			) {
-				toplevel->close_progress =
-					1.0f;
-
-				toplevel->close_wait_time =
-					0.0f;
-
-				/*
-				* Only now ask the client to close.
-				*
-				* If it immediately exits, xdg_toplevel_unmap()
-				* will remove it before the restore animation
-				* becomes visible.
-				*/
-				wlr_xdg_toplevel_send_close(
-					toplevel->xdg_toplevel
-				);
-
-				toplevel->close_state =
-					SHADY_CLOSE_WAITING;
-			}
-
-			break;
-
-		case SHADY_CLOSE_WAITING:
-			/*
-			* The client has received the close request.
-			*
-			* A normal application will usually unmap during this
-			* period. If it stays mapped, assume that it needs user
-			* interaction and restore the window.
-			*/
-			toplevel->close_wait_time +=
-				dt;
-
-			if (
-				toplevel->close_wait_time >=
-				CLOSE_WAIT_SECONDS
-			) {
-				toplevel->close_state =
-					SHADY_CLOSE_RESTORING;
-			}
-
-			break;
-
-		case SHADY_CLOSE_RESTORING:
-			/*
-			* Reverse the exact same shader animation:
-			*
-			*     1.0 --------> 0.0
-			*     crumpled     normal
-			*/
-			toplevel->close_progress -=
-				dt /
-				CLOSE_RESTORE_SECONDS;
-
-			if (
-				toplevel->close_progress <=
-				0.0f
-			) {
-				toplevel->close_progress =
-					0.0f;
-
-				toplevel->close_wait_time =
-					0.0f;
-
-				toplevel->close_state =
-					SHADY_CLOSE_ARMED;
-			}
-
-			break;
-		case SHADY_CLOSE_ARMED:
-			/*
-			* The window is completely normal and interactive here.
-			*
-			* Later, the renderer will keep a compositor-owned snapshot
-			* while this state is active. If the client actually unmaps,
-			* that snapshot becomes the exit animation ghost.
-			*/
-			break;
-		case SHADY_CLOSE_IDLE:
-		default:
-			break;
-		}
+		shady_close_animation_update_toplevel(toplevel, dt);
 	}
-	struct shady_close_snapshot *snapshot;
-	struct shady_close_snapshot *tmp;
-
-	wl_list_for_each_safe(
-		snapshot,
-		tmp,
-		&close_snapshots,
-		link
-	) {
-		if (!snapshot->animating) {
-			continue;
-		}
-
-		snapshot->progress +=
-			dt /
-			CLOSE_ANIMATION_SECONDS;
-
-		if (
-			snapshot->progress >=
-			1.0f
-		) {
-			if (
-				snapshot->texture
-			) {
-				glDeleteTextures(
-					1,
-					&snapshot->texture
-				);
-			}
-
-			wl_list_remove(
-				&snapshot->link
-			);
-
-			free(
-				snapshot
-			);
-		}
-	}
+	shady_close_animation_update_snapshots(&close_snapshots, dt);
 }
 
 static struct shady_close_snapshot *
