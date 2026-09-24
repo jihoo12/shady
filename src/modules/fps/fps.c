@@ -19,6 +19,8 @@
 #define HOLD_MIN .28f
 #define HOLD_MAX 2.50f
 #define EYE_HEIGHT .40f
+#define PLAYER_RADIUS .10f
+#define STEP_HEIGHT .46f
 #define MOVE_SPEED 1.25f
 #define GRAVITY 3.8f
 #define JUMP_SPEED 1.45f
@@ -46,6 +48,31 @@ void shady_fps_update(struct shady_server*s,float dt){
 	if(s->fps.right){mx+=rx;mz+=rz;}if(s->fps.left){mx-=rx;mz-=rz;}
 	float ml=sqrtf(mx*mx+mz*mz);
 	if(ml>.001f){c->pos_x+=mx/ml*MOVE_SPEED*dt;c->pos_z+=mz/ml*MOVE_SPEED*dt;}
+
+	struct shady_world world=shady_world_default();
+	/* Grounded players may step onto a nearby low box. The test platform is
+	 * 0.42 units above the floor, which is higher than the current jump apex,
+	 * so landing-only collision made it physically unreachable. */
+	if(c->grounded && ml>.001f){
+		float feet_y=c->pos_y-EYE_HEIGHT;
+		struct shady_box_collider footprint={
+			c->pos_x-PLAYER_RADIUS,c->pos_x+PLAYER_RADIUS,
+			feet_y,feet_y,
+			c->pos_z-PLAYER_RADIUS,c->pos_z+PLAYER_RADIUS
+		};
+		float step_y=feet_y;
+		bool step=false;
+		for(size_t i=0;i<world.collider_count;i++){
+			const struct shady_box_collider*surface=&world.colliders[i];
+			float rise=surface->max_y-feet_y;
+			if(rise>0.001f && rise<=STEP_HEIGHT &&
+					shady_box_overlap_xz(surface,&footprint) &&
+					(!step||surface->max_y>step_y)){
+				step_y=surface->max_y;step=true;
+			}
+		}
+		if(step)c->pos_y=step_y+EYE_HEIGHT;
+	}
 	if(s->fps.jump_queued&&c->grounded){c->vel_y=JUMP_SPEED;c->grounded=false;}
 	s->fps.jump_queued=false;
 
@@ -58,13 +85,11 @@ void shady_fps_update(struct shady_server*s,float dt){
 	 * horizontal footprint makes platform edges feel physical without making
 	 * the player excessively wide. Only land while crossing a surface from
 	 * above, so walking below an elevated platform cannot snap us upward. */
-	const float radius=.10f;
 	struct shady_box_collider feet={
-		c->pos_x-radius,c->pos_x+radius,
+		c->pos_x-PLAYER_RADIUS,c->pos_x+PLAYER_RADIUS,
 		next_feet,next_feet,
-		c->pos_z-radius,c->pos_z+radius
+		c->pos_z-PLAYER_RADIUS,c->pos_z+PLAYER_RADIUS
 	};
-	struct shady_world world=shady_world_default();
 	bool landed=false;
 	float support_y=0.f;
 	for(size_t i=0;i<world.collider_count;i++){
