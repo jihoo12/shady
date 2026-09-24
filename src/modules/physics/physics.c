@@ -6,8 +6,8 @@
 #include "../../render/render.h"
 #include "../window_motion/window_motion.h"
 #include "../fps/fps.h"
+#include "../../world/floor.h"
 #define WINDOW_GRAVITY 2.8f
-#define FLOOR_Y -0.62f
 
 void shady_physics_init(struct shady_server *server) {
 	server->physics.gravity_enabled=server->config.physics_enabled && server->config.window_gravity;
@@ -22,6 +22,7 @@ void shady_physics_toggle_gravity(struct shady_server *server) {
 void shady_physics_update(struct shady_server *server,float dt,float logical_w,float logical_h) {
 	if(!server->config.physics_enabled || !server->physics.gravity_enabled || !server->camera.first_person || dt<=0.f || logical_w<=0.f || logical_h<=0.f) return;
 	const float restitution=.22f, friction_rate=7.f, angular_kick=.22f;
+	const struct shady_floor floor=shady_world_floor();
 	struct shady_toplevel *t;
 	wl_list_for_each(t,&server->toplevels,link) {
 		if(shady_fps_is_holding(server,t)){shady_physics_stop(t);continue;}
@@ -37,8 +38,10 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 		float half_h=fabsf(cx)*world_h*.5f+fabsf(sx*sy)*world_w*.5f;
 		if(half_h<.012f)half_h=.012f;
 		t->physics.vy-=WINDOW_GRAVITY*dt; center_x+=t->physics.vx*dt; center_y+=t->physics.vy*dt; t->transform.z+=t->physics.vz*dt;
-		float floor_center=FLOOR_Y+half_h;
-		if(center_y<=floor_center){
+		float floor_center=floor.y+half_h;
+		/* The floor is finite: outside its X/Z footprint the window keeps falling. */
+		bool over_floor=shady_floor_contains_xz(&floor,center_x,t->transform.z);
+		if(over_floor && center_y<=floor_center){
 			float impact=-t->physics.vy;center_y=floor_center;
 			if(impact>.12f){t->physics.vy=impact*restitution;float side=sinf(tilt_y)>=0.f?1.f:-1.f;shady_window_motion_add_impulse(server,t,side*impact*.018f,impact*.035f,side*impact*angular_kick,-sinf(tilt_x)*impact*angular_kick);}
 			else t->physics.vy=0.f;

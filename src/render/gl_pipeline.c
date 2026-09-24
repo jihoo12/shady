@@ -10,6 +10,7 @@
 
 #include <EGL/egl.h>
 #include <GLES2/gl2ext.h>
+#include "../world/floor.h"
 
 #ifndef SHADY_SHADER_DIR
 #define SHADY_SHADER_DIR "shaders"
@@ -72,7 +73,9 @@ static const char *SHADOW_VERT =
 	"uniform mat4 u_model;\n"
 	"uniform vec2 u_wobble;\n"
 	"uniform float u_softness;\n"
+	"uniform vec4 u_floor_bounds;\n"
 	"varying vec2 v_uv;\n"
+	"varying vec2 v_shadow_xz;\n"
 	"void main() {\n"
 	"    vec2 uv = a_pos.xy;\n"
 	"    vec3 pos = a_pos;\n"
@@ -94,14 +97,18 @@ static const char *SHADOW_VERT =
 	"    gl_Position = u_vp * vec4(projected, 1.0);\n"
 	"    gl_Position.y = -gl_Position.y;\n"
 	"    v_uv = uv;\n"
+	"    v_shadow_xz = projected.xz;\n"
 	"}\n";
 
 static const char *SHADOW_FRAG =
 	"precision mediump float;\n"
 	"uniform float u_softness;\n"
 	"uniform float u_opacity;\n"
+	"uniform vec4 u_floor_bounds;\n"
 	"varying vec2 v_uv;\n"
+	"varying vec2 v_shadow_xz;\n"
 	"void main() {\n"
+	"    if (v_shadow_xz.x < u_floor_bounds.x || v_shadow_xz.x > u_floor_bounds.y || v_shadow_xz.y < u_floor_bounds.z || v_shadow_xz.y > u_floor_bounds.w) discard;\n"
 	"    float edge = min(min(v_uv.x, 1.0-v_uv.x), min(v_uv.y, 1.0-v_uv.y));\n"
 	"    float feather = smoothstep(0.0, u_softness, edge);\n"
 	"    float core = smoothstep(0.0, u_softness * 2.2, edge);\n"
@@ -523,9 +530,10 @@ static bool create_floor_mesh(struct shady_gl_pipeline *pipeline) {
 	 * Horizontal XZ ground plane. The desktop origin is centered on-screen,
 	 * so place the ground below it in world Y instead of behind it in Z.
 	 */
-	static const GLfloat v[] = {
-		-6.0f,-0.62f,-6.0f,  6.0f,-0.62f,-6.0f, -6.0f,-0.62f,6.0f,
-		-6.0f,-0.62f, 6.0f,  6.0f,-0.62f,-6.0f,  6.0f,-0.62f,6.0f,
+	struct shady_floor f = shady_world_floor();
+	GLfloat v[] = {
+		f.min_x,f.y,f.min_z, f.max_x,f.y,f.min_z, f.min_x,f.y,f.max_z,
+		f.min_x,f.y,f.max_z, f.max_x,f.y,f.min_z, f.max_x,f.y,f.max_z,
 	};
 	glGenBuffers(1, &pipeline->floor_vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, pipeline->floor_vbo);
@@ -813,6 +821,7 @@ bool shady_gl_pipeline_init(
 	pipeline->shadow_u_wobble = glGetUniformLocation(pipeline->shadow_prog, "u_wobble");
 	pipeline->shadow_u_softness = glGetUniformLocation(pipeline->shadow_prog, "u_softness");
 	pipeline->shadow_u_opacity = glGetUniformLocation(pipeline->shadow_prog, "u_opacity");
+	pipeline->shadow_u_floor_bounds = glGetUniformLocation(pipeline->shadow_prog, "u_floor_bounds");
 
 	pipeline->debug_prog = link_program(DEBUG_VERT, DEBUG_FRAG, "debug ray");
 	if (!pipeline->debug_prog) {
@@ -1132,8 +1141,10 @@ void shady_gl_pipeline_draw_sides(
 
 void shady_gl_pipeline_draw_floor(
 	struct shady_gl_pipeline *pipeline,
-	const float vp[16]
+	const float vp[16],
+	const struct shady_floor *floor
 ) {
+	(void)floor;
 	glUseProgram(pipeline->floor_prog);
 	glUniformMatrix4fv(pipeline->floor_u_vp, 1, GL_FALSE, vp);
 	glDisable(GL_BLEND);
@@ -1153,12 +1164,15 @@ void shady_gl_pipeline_draw_shadow(
 	const float model[16],
 	float wobble_x,
 	float wobble_y,
-	float height
+	float height,
+	const struct shady_floor *floor
 ) {
 	glUseProgram(pipeline->shadow_prog);
 	glUniformMatrix4fv(pipeline->shadow_u_vp, 1, GL_FALSE, vp);
 	glUniformMatrix4fv(pipeline->shadow_u_model, 1, GL_FALSE, model);
 	glUniform2f(pipeline->shadow_u_wobble, wobble_x, wobble_y);
+	glUniform4f(pipeline->shadow_u_floor_bounds, floor->min_x, floor->max_x,
+		floor->min_z, floor->max_z);
 
 	/*
 	 * Approximate an area light: as the window moves away from the ground,

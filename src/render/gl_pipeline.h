@@ -3,6 +3,7 @@
 
 #include <GLES2/gl2.h>
 #include <stdbool.h>
+#include "../world/floor.h"
 
 struct wlr_renderer;
 
@@ -64,6 +65,7 @@ struct shady_gl_pipeline {
 	GLint shadow_u_wobble;
 	GLint shadow_u_softness;
 	GLint shadow_u_opacity;
+	GLint shadow_u_floor_bounds;
 
 	/* FPS picking-ray debug overlay. */
 	GLuint debug_prog;
@@ -103,7 +105,8 @@ void shady_gl_pipeline_draw_sides(
 
 void shady_gl_pipeline_draw_floor(
 	struct shady_gl_pipeline *pipeline,
-	const float vp[16]
+	const float vp[16],
+	const struct shady_floor *floor
 );
 
 void shady_gl_pipeline_draw_shadow(
@@ -112,7 +115,8 @@ void shady_gl_pipeline_draw_shadow(
 	const float model[16],
 	float wobble_x,
 	float wobble_y,
-	float height
+	float height,
+	const struct shady_floor *floor
 );
 
 void shady_gl_pipeline_draw_crosshair(
