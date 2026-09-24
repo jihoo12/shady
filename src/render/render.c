@@ -520,7 +520,9 @@ void shady_render_output_frame(
 		view
 	);
 
-	shady_environment_draw(server, &pipeline, view, proj);\n\n	/*
+	shady_environment_draw(server, &pipeline, view, proj);
+
+	/*
 	 * Draw a world-space reference plane before windows. Because it shares
 	 * the depth buffer and camera VP matrix, orbiting immediately reveals
 	 * perspective and per-window Z separation.
