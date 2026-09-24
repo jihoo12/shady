@@ -35,3 +35,14 @@ void shady_window_motion_update_toplevel(struct shady_server *server,
 	toplevel->motion.tilt_x += toplevel->motion.tilt_vx * dt;
 	toplevel->motion.tilt_y += toplevel->motion.tilt_vy * dt;
 }
+
+void shady_window_motion_add_impulse(struct shady_server *server,
+		struct shady_toplevel *toplevel, float wobble_x, float wobble_y,
+		float tilt_x, float tilt_y) {
+	if (server->config.window_wobble) {
+		toplevel->motion.wobble_vx += wobble_x;
+		toplevel->motion.wobble_vy += wobble_y;
+	}
+	toplevel->motion.tilt_vx += tilt_x;
+	toplevel->motion.tilt_vy += tilt_y;
+}

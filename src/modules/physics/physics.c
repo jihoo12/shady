@@ -4,6 +4,7 @@
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include "../../render/render.h"
+#include "../window_motion/window_motion.h"
 #define WINDOW_GRAVITY 2.8f
 #define FLOOR_Y -0.62f
 
@@ -37,7 +38,7 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 		float floor_center=FLOOR_Y+half_h;
 		if(center_y<=floor_center){
 			float impact=-t->physics.vy;center_y=floor_center;
-			if(impact>.12f){t->physics.vy=impact*restitution;float side=sinf(t->motion.tilt_y)>=0.f?1.f:-1.f;t->motion.tilt_vx+=side*impact*angular_kick;t->motion.tilt_vy-=sinf(t->motion.tilt_x)*impact*angular_kick;if(server->config.window_wobble){t->motion.wobble_vx+=side*impact*.018f;t->motion.wobble_vy+=impact*.035f;}}
+			if(impact>.12f){t->physics.vy=impact*restitution;float side=sinf(t->motion.tilt_y)>=0.f?1.f:-1.f;shady_window_motion_add_impulse(server,t,side*impact*.018f,impact*.035f,side*impact*angular_kick,-sinf(t->motion.tilt_x)*impact*angular_kick);}
 			else t->physics.vy=0.f;
 			float friction=1.f-friction_rate*dt;if(friction<0.f)friction=0.f;t->motion.tilt_vx*=friction;t->motion.tilt_vy*=friction;t->physics.vx*=friction;t->physics.vz*=friction;
 		}
@@ -45,3 +46,6 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 		wlr_scene_node_set_position(&t->scene_tree->node,x,y);
 	}
 }
+
+void shady_physics_set_velocity(struct shady_toplevel *toplevel,float vx,float vy,float vz){toplevel->physics.vx=vx;toplevel->physics.vy=vy;toplevel->physics.vz=vz;}
+void shady_physics_stop(struct shady_toplevel *toplevel){shady_physics_set_velocity(toplevel,0.f,0.f,0.f);}
