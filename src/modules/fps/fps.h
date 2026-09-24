@@ -2,7 +2,11 @@
 #define SHADY_MODULE_FPS_H
 #include "../../shady.h"
 struct wlr_pointer_axis_event;
+struct wlr_input_device;
 #if SHADY_HAS_FPS
+void shady_fps_host_init(struct shady_server *server);
+void shady_fps_host_finish(struct shady_server *server);
+void shady_fps_host_pointer_added(struct shady_server *server,struct wlr_input_device *device);
 bool shady_fps_toggle(struct shady_server *server);
 bool shady_fps_toggle_capture(struct shady_server *server);
 bool shady_fps_handle_key(struct shady_server *server,const xkb_keysym_t *syms,int nsyms,uint32_t state);
@@ -14,6 +18,9 @@ void shady_fps_update_held_window(struct shady_server *server,float logical_w,fl
 void shady_fps_toplevel_gone(struct shady_server *server,struct shady_toplevel *toplevel);
 bool shady_fps_is_holding(const struct shady_server *server,const struct shady_toplevel *toplevel);
 #else
+static inline void shady_fps_host_init(struct shady_server*s){(void)s;}
+static inline void shady_fps_host_finish(struct shady_server*s){(void)s;}
+static inline void shady_fps_host_pointer_added(struct shady_server*s,struct wlr_input_device*d){(void)s;(void)d;}
 static inline bool shady_fps_is_holding(const struct shady_server*s,const struct shady_toplevel*t){(void)s;(void)t;return false;}
 static inline bool shady_fps_toggle(struct shady_server*s){(void)s;return true;}
 static inline bool shady_fps_toggle_capture(struct shady_server*s){(void)s;return false;}

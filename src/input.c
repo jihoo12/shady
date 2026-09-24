@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_cursor.h>
+#include <wlr/backend/wayland.h>
 #include <wlr/types/wlr_data_device.h>
 #include <wlr/types/wlr_input_device.h>
 #include <wlr/types/wlr_keyboard.h>
@@ -344,6 +345,7 @@ static void server_new_keyboard(struct shady_server *server,
 static void server_new_pointer(struct shady_server *server,
 		struct wlr_input_device *device) {
 	wlr_cursor_attach_input_device(server->cursor, device);
+	shady_fps_host_pointer_added(server, device);
 }
 
 void server_new_input(struct wl_listener *listener, void *data) {

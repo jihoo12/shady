@@ -5,6 +5,19 @@ project('shady', 'c', version: '0.1.0',
 wlroots = dependency('wlroots-0.20', version: ['>=0.20.2', '<0.21'])
 egl = dependency('egl')
 glesv2 = dependency('glesv2')
+wayland_client = dependency('wayland-client')
+wayland_protocols = dependency('wayland-protocols')
+wayland_scanner = find_program('wayland-scanner')
+protocol_dir = wayland_protocols.get_variable(pkgdatadir: 'pkgdatadir')
+pointer_constraints_xml = join_paths(protocol_dir, 'unstable', 'pointer-constraints', 'pointer-constraints-unstable-v1.xml')
+pointer_constraints_header = custom_target('pointer-constraints-client-header',
+  input: pointer_constraints_xml,
+  output: 'pointer-constraints-unstable-v1-client-protocol.h',
+  command: [wayland_scanner, 'client-header', '@INPUT@', '@OUTPUT@'])
+pointer_constraints_code = custom_target('pointer-constraints-private-code',
+  input: pointer_constraints_xml,
+  output: 'pointer-constraints-unstable-v1-protocol.c',
+  command: [wayland_scanner, 'private-code', '@INPUT@', '@OUTPUT@'])
 
 shader_dir = join_paths(meson.project_source_root(), 'shaders')
 
@@ -29,7 +42,7 @@ if physics_enabled
   shady_sources += 'src/modules/physics/physics.c'
 endif
 if fps_enabled
-  shady_sources += 'src/modules/fps/fps.c'
+  shady_sources += ['src/modules/fps/fps.c', pointer_constraints_header, pointer_constraints_code]
 endif
 if window_motion_enabled
   shady_sources += 'src/modules/window_motion/window_motion.c'
@@ -57,6 +70,7 @@ executable('shady',
   dependencies: [
     wlroots,
     dependency('wayland-server'),
+    wayland_client,
     dependency('xkbcommon'),
     egl,
     glesv2,
