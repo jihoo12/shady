@@ -698,7 +698,7 @@ void shady_render_output_frame(
 					snapshot->height = th;
 					snapshot->tilt_x = toplevel->motion.tilt_x;
 					snapshot->tilt_y = toplevel->motion.tilt_y;
-					snapshot->z = toplevel->physics.z;
+					snapshot->z = toplevel->transform.z;
 					snapshot->wobble_x = toplevel->motion.wobble_x;
 					snapshot->wobble_y = toplevel->motion.wobble_y;
 					snapshot->has_alpha = attribs.has_alpha;
@@ -715,7 +715,7 @@ void shady_render_output_frame(
 			th,
 			logical_w,
 			logical_h,
-			toplevel->physics.z,
+			toplevel->transform.z,
 			toplevel->motion.tilt_x,
 			toplevel->motion.tilt_y
 		);

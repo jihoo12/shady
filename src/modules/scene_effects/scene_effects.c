@@ -23,8 +23,8 @@ void shady_scene_effects_draw_shadows(struct shady_server *server,
 		float model[16];
 		shady_window_model(model,(float)(t->scene_tree->node.x+ox),
 			(float)(t->scene_tree->node.y+oy),tw,th,logical_w,logical_h,
-			t->physics.z,t->motion.tilt_x,t->motion.tilt_y);
-		shady_gl_pipeline_draw_shadow(pipeline,vp,model,t->motion.wobble_x,t->motion.wobble_y,t->physics.z);
+			t->transform.z,t->motion.tilt_x,t->motion.tilt_y);
+		shady_gl_pipeline_draw_shadow(pipeline,vp,model,t->motion.wobble_x,t->motion.wobble_y,t->transform.z);
 	}
 }
 

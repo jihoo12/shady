@@ -498,8 +498,9 @@ void server_cursor_axis(struct wl_listener *listener, void *data) {
 		struct shady_toplevel *toplevel = focused_toplevel(server);
 		if (toplevel) {
 			float direction = event->delta < 0.0 ? 1.0f : -1.0f;
-			shady_physics_move_z(toplevel, direction * WINDOW_Z_STEP,
-				WINDOW_Z_MIN, WINDOW_Z_MAX);
+			toplevel->transform.z += direction * WINDOW_Z_STEP;
+			if (toplevel->transform.z < WINDOW_Z_MIN) toplevel->transform.z = WINDOW_Z_MIN;
+			if (toplevel->transform.z > WINDOW_Z_MAX) toplevel->transform.z = WINDOW_Z_MAX;
 			shady_render_schedule_all_outputs(server);
 		}
 		return;

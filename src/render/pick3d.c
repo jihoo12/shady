@@ -71,7 +71,7 @@ struct shady_toplevel *shady_toplevel_at_3d(struct shady_server *server,
 
 		float model[16];
 		shady_window_model(model, layout_x, layout_y, tw, th,
-			logical_w, logical_h, toplevel->physics.z, toplevel->motion.tilt_x, toplevel->motion.tilt_y);
+			logical_w, logical_h, toplevel->transform.z, toplevel->motion.tilt_x, toplevel->motion.tilt_y);
 
 		float t, u, v;
 		bool front_hit = false;
@@ -146,7 +146,7 @@ struct shady_toplevel *shady_toplevel_at_camera_center(
 		shady_window_model(model,
 			(float)(toplevel->scene_tree->node.x + ox),
 			(float)(toplevel->scene_tree->node.y + oy),
-			tw, th, logical_w, logical_h, toplevel->physics.z,
+			tw, th, logical_w, logical_h, toplevel->transform.z,
 			toplevel->motion.tilt_x, toplevel->motion.tilt_y);
 		float t, u, v;
 		bool front_hit = false;

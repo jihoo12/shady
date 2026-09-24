@@ -139,6 +139,8 @@ struct shady_toplevel {
 	struct wl_listener request_resize;
 	struct wl_listener request_maximize;
 	struct wl_listener request_fullscreen;
+	/* Core 3D transform. Z is spatial state, not physics state. */
+	struct { float z; } transform;
 	struct shady_window_motion_state motion;
 	struct shady_window_physics_state physics;
 	struct shady_close_animation_state close;

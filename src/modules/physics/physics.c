@@ -35,7 +35,7 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 		float sx=sinf(tilt_x),cx=cosf(tilt_x),sy=sinf(tilt_y);
 		float half_h=fabsf(cx)*world_h*.5f+fabsf(sx*sy)*world_w*.5f;
 		if(half_h<.012f)half_h=.012f;
-		t->physics.vy-=WINDOW_GRAVITY*dt; center_x+=t->physics.vx*dt; center_y+=t->physics.vy*dt; t->physics.z+=t->physics.vz*dt;
+		t->physics.vy-=WINDOW_GRAVITY*dt; center_x+=t->physics.vx*dt; center_y+=t->physics.vy*dt; t->transform.z+=t->physics.vz*dt;
 		float floor_center=FLOOR_Y+half_h;
 		if(center_y<=floor_center){
 			float impact=-t->physics.vy;center_y=floor_center;
@@ -50,5 +50,3 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 
 void shady_physics_set_velocity(struct shady_toplevel *toplevel,float vx,float vy,float vz){toplevel->physics.vx=vx;toplevel->physics.vy=vy;toplevel->physics.vz=vz;}
 void shady_physics_stop(struct shady_toplevel *toplevel){shady_physics_set_velocity(toplevel,0.f,0.f,0.f);}
-
-void shady_physics_move_z(struct shady_toplevel *toplevel,float delta,float min_z,float max_z){toplevel->physics.z+=delta;if(toplevel->physics.z<min_z)toplevel->physics.z=min_z;if(toplevel->physics.z>max_z)toplevel->physics.z=max_z;}
