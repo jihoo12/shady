@@ -10,8 +10,7 @@
 #include <wlr/types/wlr_seat.h>
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/backend/wayland.h>
-#include <wlr/types/wlr_input_device.h>
-#include <string.h>
+ #include <string.h>
 #include "pointer-constraints-unstable-v1-client-protocol.h"
 #include "../../render/math3d.h"
 #include "../../render/pick3d.h"
@@ -29,12 +28,27 @@ static void host_lock_update(struct shady_server*s){
 	s->fps.host_lock=zwp_pointer_constraints_v1_lock_pointer(s->fps.host_constraints,surface,s->fps.host_pointer,NULL,ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
 	wl_surface_commit(surface);
 }
-static void host_registry_global(void*data,struct wl_registry*r,uint32_t name,const char*iface,uint32_t version){struct shady_server*s=data;if(strcmp(iface,zwp_pointer_constraints_v1_interface.name)==0&&!s->fps.host_constraints)s->fps.host_constraints=wl_registry_bind(r,name,&zwp_pointer_constraints_v1_interface,version>1?1:version);}
+static void host_seat_capabilities(void*data,struct wl_seat*seat,enum wl_seat_capability caps){
+	struct shady_server*s=data;
+	if((caps&WL_SEAT_CAPABILITY_POINTER)&&!s->fps.host_pointer){s->fps.host_pointer=wl_seat_get_pointer(seat);host_lock_update(s);}
+	else if(!(caps&WL_SEAT_CAPABILITY_POINTER)&&s->fps.host_pointer){host_lock_destroy(s);wl_pointer_release(s->fps.host_pointer);s->fps.host_pointer=NULL;}
+}
+static void host_seat_name(void*data,struct wl_seat*seat,const char*name){(void)data;(void)seat;(void)name;}
+static const struct wl_seat_listener host_seat_listener={.capabilities=host_seat_capabilities,.name=host_seat_name};
+static void host_registry_global(void*data,struct wl_registry*r,uint32_t name,const char*iface,uint32_t version){
+	struct shady_server*s=data;
+	if(strcmp(iface,zwp_pointer_constraints_v1_interface.name)==0&&!s->fps.host_constraints)
+		s->fps.host_constraints=wl_registry_bind(r,name,&zwp_pointer_constraints_v1_interface,version>1?1:version);
+	else if(strcmp(iface,wl_seat_interface.name)==0&&!s->fps.host_seat){
+		uint32_t v=version>WL_SEAT_RELEASE_SINCE_VERSION?WL_SEAT_RELEASE_SINCE_VERSION:version;
+		s->fps.host_seat=wl_registry_bind(r,name,&wl_seat_interface,v);
+		wl_seat_add_listener(s->fps.host_seat,&host_seat_listener,s);
+	}
+}
 static void host_registry_remove(void*data,struct wl_registry*r,uint32_t name){(void)data;(void)r;(void)name;}
 static const struct wl_registry_listener host_registry_listener={.global=host_registry_global,.global_remove=host_registry_remove};
 void shady_fps_host_init(struct shady_server*s){if(!wlr_backend_is_wl(s->backend))return;struct wl_display*d=wlr_wl_backend_get_remote_display(s->backend);s->fps.host_registry=wl_display_get_registry(d);wl_registry_add_listener(s->fps.host_registry,&host_registry_listener,s);wl_display_roundtrip(d);}
-void shady_fps_host_pointer_added(struct shady_server*s,struct wlr_input_device*d){if(!wlr_input_device_is_wl(d)||s->fps.host_pointer)return;struct wl_seat*seat=wlr_wl_input_device_get_seat(d);s->fps.host_pointer=wl_seat_get_pointer(seat);host_lock_update(s);}
-void shady_fps_host_finish(struct shady_server*s){host_lock_destroy(s);if(s->fps.host_pointer){wl_pointer_release(s->fps.host_pointer);s->fps.host_pointer=NULL;}if(s->fps.host_constraints){zwp_pointer_constraints_v1_destroy(s->fps.host_constraints);s->fps.host_constraints=NULL;}if(s->fps.host_registry){wl_registry_destroy(s->fps.host_registry);s->fps.host_registry=NULL;}}
+void shady_fps_host_finish(struct shady_server*s){host_lock_destroy(s);if(s->fps.host_pointer){wl_pointer_release(s->fps.host_pointer);s->fps.host_pointer=NULL;}if(s->fps.host_seat){wl_seat_release(s->fps.host_seat);s->fps.host_seat=NULL;}if(s->fps.host_constraints){zwp_pointer_constraints_v1_destroy(s->fps.host_constraints);s->fps.host_constraints=NULL;}if(s->fps.host_registry){wl_registry_destroy(s->fps.host_registry);s->fps.host_registry=NULL;}}
 #define LOOK_SENS .0032f
 #define HOLD_MIN .28f
 #define HOLD_MAX 2.50f

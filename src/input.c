@@ -345,7 +345,6 @@ static void server_new_keyboard(struct shady_server *server,
 static void server_new_pointer(struct shady_server *server,
 		struct wlr_input_device *device) {
 	wlr_cursor_attach_input_device(server->cursor, device);
-	shady_fps_host_pointer_added(server, device);
 }
 
 void server_new_input(struct wl_listener *listener, void *data) {
