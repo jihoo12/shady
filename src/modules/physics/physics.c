@@ -37,10 +37,19 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 		float sx=sinf(tilt_x),cx=cosf(tilt_x),sy=sinf(tilt_y);
 		float half_h=fabsf(cx)*world_h*.5f+fabsf(sx*sy)*world_w*.5f;
 		if(half_h<.012f)half_h=.012f;
+		/* Conservative XZ footprint of the tilted window. This keeps collision
+		 * active while any part of the window still overlaps the finite floor. */
+		float half_x=fabsf(cosf(tilt_y))*world_w*.5f;
+		float half_z=fabsf(sinf(tilt_y))*world_w*.5f + fabsf(sinf(tilt_x))*world_h*.5f;
+		if(half_x<.006f)half_x=.006f;
+		if(half_z<.006f)half_z=.006f;
 		t->physics.vy-=WINDOW_GRAVITY*dt; center_x+=t->physics.vx*dt; center_y+=t->physics.vy*dt; t->transform.z+=t->physics.vz*dt;
 		float floor_center=floor.y+half_h;
 		/* The floor is finite: outside its X/Z footprint the window keeps falling. */
-		bool over_floor=shady_floor_contains_xz(&floor,center_x,t->transform.z);
+		bool over_floor = center_x + half_x >= floor.min_x &&
+			center_x - half_x <= floor.max_x &&
+			t->transform.z + half_z >= floor.min_z &&
+			t->transform.z - half_z <= floor.max_z;
 		if(over_floor && center_y<=floor_center){
 			float impact=-t->physics.vy;center_y=floor_center;
 			if(impact>.12f){t->physics.vy=impact*restitution;float side=sinf(tilt_y)>=0.f?1.f:-1.f;shady_window_motion_add_impulse(server,t,side*impact*.018f,impact*.035f,side*impact*angular_kick,-sinf(tilt_x)*impact*angular_kick);}
