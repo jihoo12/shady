@@ -9,6 +9,10 @@
 #include <xkbcommon/xkbcommon.h>
 
 #include "render/math3d.h"
+#include "modules/fps/state.h"
+#include "modules/physics/state.h"
+#include "modules/window_motion/state.h"
+#include "modules/close_animation/state.h"
 
 struct wlr_allocator;
 struct wlr_backend;
@@ -31,36 +35,6 @@ enum shady_cursor_mode {
 	SHADY_CURSOR_RESIZE,
 	SHADY_CURSOR_CAMERA_ORBIT,
 	SHADY_CURSOR_CAMERA_PAN,
-};
-
-enum shady_close_state {
-	SHADY_CLOSE_IDLE,
-	SHADY_CLOSE_CRUMPLING,
-	SHADY_CLOSE_WAITING,
-	SHADY_CLOSE_RESTORING,
-
-	/*
-	 * The client survived the close request.
-	 *
-	 * The window is fully restored and interactive, but if it
-	 * eventually unmaps we want to play the real exit animation
-	 * from a compositor-owned snapshot.
-	 */
-	SHADY_CLOSE_ARMED,
-};
-
-struct shady_toplevel;
-
-struct shady_fps_state {
-	bool forward, back, left, right;
-	bool jump_queued;
-	struct shady_toplevel *held_toplevel;
-	float hold_distance;
-	bool input_capture;
-};
-
-struct shady_physics_state {
-	bool gravity_enabled;
 };
 
 struct shady_keybind {
@@ -165,27 +139,9 @@ struct shady_toplevel {
 	struct wl_listener request_resize;
 	struct wl_listener request_maximize;
 	struct wl_listener request_fullscreen;
-	struct {
-		float wobble_x, wobble_y;
-		float wobble_vx, wobble_vy;
-		float tilt_x, tilt_y;
-		float tilt_vx, tilt_vy;
-		double last_move_x, last_move_y;
-		bool wobble_dragging;
-	} motion;
-
-	/* Per-window position and velocity owned by the physics module. */
-	struct {
-		float z;
-		float vx, vy, vz;
-	} physics;
-
-	/* Animated close lifecycle owned by the close-animation module. */
-	struct {
-		enum shady_close_state state;
-		float progress;
-		float wait_time;
-	} close;
+	struct shady_window_motion_state motion;
+	struct shady_window_physics_state physics;
+	struct shady_close_animation_state close;
 };
 
 struct shady_popup {
