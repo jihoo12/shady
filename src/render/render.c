@@ -696,11 +696,11 @@ void shady_render_output_frame(
 						(float)toplevel->scene_tree->node.y;
 					snapshot->width = tw;
 					snapshot->height = th;
-					snapshot->motion.tilt_x = toplevel->motion.tilt_x;
-					snapshot->motion.tilt_y = toplevel->motion.tilt_y;
-					snapshot->physics.z = toplevel->physics.z;
-					snapshot->motion.wobble_x = toplevel->motion.wobble_x;
-					snapshot->motion.wobble_y = toplevel->motion.wobble_y;
+					snapshot->tilt_x = toplevel->motion.tilt_x;
+					snapshot->tilt_y = toplevel->motion.tilt_y;
+					snapshot->z = toplevel->physics.z;
+					snapshot->wobble_x = toplevel->motion.wobble_x;
+					snapshot->wobble_y = toplevel->motion.wobble_y;
 					snapshot->has_alpha = attribs.has_alpha;
 					snapshot->dirty = false;
 				}
@@ -777,9 +777,9 @@ void shady_render_output_frame(
 			snapshot->height,
 			logical_w,
 			logical_h,
-			snapshot->physics.z,
-			snapshot->motion.tilt_x,
-			snapshot->motion.tilt_y
+			snapshot->z,
+			snapshot->tilt_x,
+			snapshot->tilt_y
 		);
 
 		shady_mat4_multiply(
@@ -789,7 +789,7 @@ void shady_render_output_frame(
 		);
 
 		shady_scene_effects_draw_sides(server, &pipeline, mvp, model,
-			snapshot->motion.wobble_x, snapshot->motion.wobble_y, snapshot->progress);
+			snapshot->wobble_x, snapshot->wobble_y, snapshot->progress);
 
 		shady_gl_pipeline_draw_window(
 			&pipeline,
