@@ -520,7 +520,7 @@ void shady_render_output_frame(
 		view
 	);
 
-	/*
+	shady_environment_draw(server, &pipeline, view, proj);\n\n	/*
 	 * Draw a world-space reference plane before windows. Because it shares
 	 * the depth buffer and camera VP matrix, orbiting immediately reveals
 	 * perspective and per-window Z separation.
@@ -810,9 +810,6 @@ void shady_render_output_frame(
 		);
 	}
 
-
-	/* Fill only untouched far-depth pixels, after deformed geometry. */
-	shady_environment_draw(server, &pipeline, view, proj);
 
 	if (server->camera.first_person) {
 		float cross_distance = 0.f;
