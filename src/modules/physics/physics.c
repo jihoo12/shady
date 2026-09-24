@@ -7,6 +7,7 @@
 #include "../window_motion/window_motion.h"
 #include "../fps/fps.h"
 #include "../../world/floor.h"
+#include "../../world/collider.h"
 #define WINDOW_GRAVITY 2.8f
 
 void shady_physics_init(struct shady_server *server) {
@@ -23,6 +24,7 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 	if(!server->config.physics_enabled || !server->physics.gravity_enabled || !server->camera.first_person || dt<=0.f || logical_w<=0.f || logical_h<=0.f) return;
 	const float restitution=.22f, friction_rate=7.f, angular_kick=.22f;
 	const struct shady_floor floor=shady_world_floor();
+	const struct shady_box_collider floor_collider=shady_floor_collider(&floor);
 	struct shady_toplevel *t;
 	wl_list_for_each(t,&server->toplevels,link) {
 		if(shady_fps_is_holding(server,t)){shady_physics_stop(t);continue;}
@@ -44,13 +46,15 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 		if(half_x<.006f)half_x=.006f;
 		if(half_z<.006f)half_z=.006f;
 		t->physics.vy-=WINDOW_GRAVITY*dt; center_x+=t->physics.vx*dt; center_y+=t->physics.vy*dt; t->transform.z+=t->physics.vz*dt;
-		float floor_center=floor.y+half_h;
-		/* The floor is finite: outside its X/Z footprint the window keeps falling. */
-		bool over_floor = center_x + half_x >= floor.min_x &&
-			center_x - half_x <= floor.max_x &&
-			t->transform.z + half_z >= floor.min_z &&
-			t->transform.z - half_z <= floor.max_z;
-		if(over_floor && center_y<=floor_center){
+		struct shady_box_collider body={
+			center_x-half_x,center_x+half_x,
+			center_y-half_h,center_y+half_h,
+			t->transform.z-half_z,t->transform.z+half_z
+		};
+		float support_y=0.f;
+		bool supported=shady_box_support_y(&floor_collider,&body,&support_y);
+		float floor_center=support_y+half_h;
+		if(supported && center_y<=floor_center){
 			float impact=-t->physics.vy;center_y=floor_center;
 			if(impact>.12f){t->physics.vy=impact*restitution;float side=sinf(tilt_y)>=0.f?1.f:-1.f;shady_window_motion_add_impulse(server,t,side*impact*.018f,impact*.035f,side*impact*angular_kick,-sinf(tilt_x)*impact*angular_kick);}
 			else t->physics.vy=0.f;
