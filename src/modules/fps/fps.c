@@ -40,74 +40,50 @@ bool shady_fps_handle_motion(struct shady_server*s,double dx,double dy){if(!s->c
 bool shady_fps_handle_button(struct shady_server*s,uint32_t button,uint32_t state){if(!s->camera.first_person||!s->fps.input_capture)return false;if(button==BTN_RIGHT&&state==WL_POINTER_BUTTON_STATE_PRESSED&&s->fps.held_toplevel){struct shady_vec3 f;shady_camera_basis(&s->camera,NULL,NULL,&f);struct shady_toplevel*t=s->fps.held_toplevel;float v=2.6f;shady_physics_set_velocity(t,f.x*v,f.y*v+s->camera.vel_y,f.z*v);shady_window_motion_add_impulse(s,t,f.x*.035f,f.y*.035f,-f.y*1.1f,f.x*.7f);s->fps.held_toplevel=NULL;shady_render_schedule_all_outputs(s);return true;}if(button==BTN_LEFT&&state==WL_POINTER_BUTTON_STATE_PRESSED){if(s->fps.held_toplevel)s->fps.held_toplevel=NULL;else{float d=0,hx=0,hy=0,hz=0;struct shady_toplevel*t=shady_toplevel_at_camera_center_hit(s,&d,&hx,&hy,&hz);if(t&&d<=HOLD_MAX){struct wlr_surface*sf=t->xdg_toplevel->base->surface;struct wlr_output*o=NULL;if(!wl_list_empty(&s->outputs)){struct shady_output*out=wl_container_of(s->outputs.next,out,link);o=out->wlr_output;}if(o&&sf->current.height>0){double ox=0,oy=0;wlr_output_layout_output_coords(s->output_layout,o,&ox,&oy);float lw=(float)o->width/o->scale,lh=(float)o->height/o->scale,tw=(float)sf->current.width,th=(float)sf->current.height;float cx=((float)(t->scene_tree->node.x+ox)+tw*.5f-lw*.5f)/lh;float cy=(lh*.5f-((float)(t->scene_tree->node.y+oy)+th*.5f))/lh;s->fps.grab_offset_x=hx-cx;s->fps.grab_offset_y=hy-cy;s->fps.grab_offset_z=hz-t->transform.z;
 float model[16],inv[16];shady_window_model(model,(float)(t->scene_tree->node.x+ox),(float)(t->scene_tree->node.y+oy),tw,th,lw,lh,t->transform.z,t->motion.tilt_x,t->motion.tilt_y);if(shady_mat4_invert(inv,model)){s->fps.grab_local_x=inv[0]*hx+inv[4]*hy+inv[8]*hz+inv[12]-.5f;s->fps.grab_local_y=inv[1]*hx+inv[5]*hy+inv[9]*hz+inv[13]-.5f;s->fps.grab_local_z=inv[2]*hx+inv[6]*hy+inv[10]*hz+inv[14];}else{s->fps.grab_local_x=s->fps.grab_local_y=s->fps.grab_local_z=0;}}else{s->fps.grab_offset_x=s->fps.grab_offset_y=s->fps.grab_offset_z=0;s->fps.grab_local_x=s->fps.grab_local_y=s->fps.grab_local_z=0;}s->fps.held_toplevel=t;s->fps.hold_distance=d;if(s->fps.hold_distance<HOLD_MIN)s->fps.hold_distance=HOLD_MIN;focus_toplevel(t);}}shady_render_schedule_all_outputs(s);}return true;}
 bool shady_fps_handle_axis(struct shady_server*s,struct wlr_pointer_axis_event*e){if(!s->camera.first_person||!s->fps.input_capture||!s->fps.held_toplevel||e->orientation!=WL_POINTER_AXIS_VERTICAL_SCROLL)return false;s->fps.hold_distance+=(float)e->delta*.0025f;if(s->fps.hold_distance<HOLD_MIN)s->fps.hold_distance=HOLD_MIN;if(s->fps.hold_distance>HOLD_MAX)s->fps.hold_distance=HOLD_MAX;shady_render_schedule_all_outputs(s);return true;}
+static bool player_hits_solid(const struct shady_world*w,float x,float eye_y,float z){
+	float feet=eye_y-EYE_HEIGHT, head=eye_y+.05f;
+	struct shady_box_collider body={x-PLAYER_RADIUS,x+PLAYER_RADIUS,feet+.01f,head,z-PLAYER_RADIUS,z+PLAYER_RADIUS};
+	for(size_t i=0;i<w->collider_count;i++){
+		const struct shady_box_collider*b=&w->colliders[i];
+		if(body.max_x>b->min_x&&body.min_x<b->max_x&&body.max_z>b->min_z&&body.min_z<b->max_z&&
+				body.max_y>b->min_y&&body.min_y<b->max_y)return true;
+	}
+	return false;
+}
+static bool player_step_y(const struct shady_world*w,float x,float feet_y,float z,float*out){
+	bool found=false;float best=feet_y;
+	struct shady_box_collider foot={x-PLAYER_RADIUS,x+PLAYER_RADIUS,feet_y,feet_y,z-PLAYER_RADIUS,z+PLAYER_RADIUS};
+	for(size_t i=0;i<w->collider_count;i++){
+		const struct shady_box_collider*b=&w->colliders[i];float rise=b->max_y-feet_y;
+		if(rise>.001f&&rise<=STEP_HEIGHT&&shady_box_overlap_xz(b,&foot)&&(!found||b->max_y>best)){best=b->max_y;found=true;}
+	}
+	if(found&&out)*out=best;return found;
+}
 void shady_fps_update(struct shady_server*s,float dt){
-	struct shady_camera*c=&s->camera;
-	if(!c->first_person)return;
-	float sy=sinf(c->yaw),cy=cosf(c->yaw),fx=-sy,fz=-cy,rx=cy,rz=-sy,mx=0,mz=0;
-	if(s->fps.forward){mx+=fx;mz+=fz;}if(s->fps.back){mx-=fx;mz-=fz;}
-	if(s->fps.right){mx+=rx;mz+=rz;}if(s->fps.left){mx-=rx;mz-=rz;}
-	float ml=sqrtf(mx*mx+mz*mz);
-	if(ml>.001f){c->pos_x+=mx/ml*MOVE_SPEED*dt;c->pos_z+=mz/ml*MOVE_SPEED*dt;}
-
+	struct shady_camera*c=&s->camera;if(!c->first_person)return;
 	struct shady_world world=shady_world_default();
-	/* Grounded players may step onto a nearby low box. The test platform is
-	 * 0.42 units above the floor, which is higher than the current jump apex,
-	 * so landing-only collision made it physically unreachable. */
-	if(c->grounded && ml>.001f){
-		float feet_y=c->pos_y-EYE_HEIGHT;
-		struct shady_box_collider footprint={
-			c->pos_x-PLAYER_RADIUS,c->pos_x+PLAYER_RADIUS,
-			feet_y,feet_y,
-			c->pos_z-PLAYER_RADIUS,c->pos_z+PLAYER_RADIUS
-		};
-		float step_y=feet_y;
-		bool step=false;
-		for(size_t i=0;i<world.collider_count;i++){
-			const struct shady_box_collider*surface=&world.colliders[i];
-			float rise=surface->max_y-feet_y;
-			if(rise>0.001f && rise<=STEP_HEIGHT &&
-					shady_box_overlap_xz(surface,&footprint) &&
-					(!step||surface->max_y>step_y)){
-				step_y=surface->max_y;step=true;
-			}
-		}
-		if(step)c->pos_y=step_y+EYE_HEIGHT;
+	float sy=sinf(c->yaw),cy=cosf(c->yaw),fx=-sy,fz=-cy,rx=cy,rz=-sy,mx=0,mz=0;
+	if(s->fps.forward){mx+=fx;mz+=fz;}if(s->fps.back){mx-=fx;mz-=fz;}if(s->fps.right){mx+=rx;mz+=rz;}if(s->fps.left){mx-=rx;mz-=rz;}
+	float ml=sqrtf(mx*mx+mz*mz);
+	if(ml>.001f){
+		float dx=mx/ml*MOVE_SPEED*dt,dz=mz/ml*MOVE_SPEED*dt,feet=c->pos_y-EYE_HEIGHT,step;
+		/* Resolve horizontal movement one axis at a time. This prevents entering
+		 * box sides and naturally slides along them. A grounded player may
+		 * replace a blocked move with a small step onto the collider. */
+		float nx=c->pos_x+dx;
+		if(!player_hits_solid(&world,nx,c->pos_y,c->pos_z))c->pos_x=nx;
+		else if(c->grounded&&player_step_y(&world,nx,feet,c->pos_z,&step)){c->pos_y=step+EYE_HEIGHT;c->pos_x=nx;c->vel_y=0.f;}
+		float nz=c->pos_z+dz;feet=c->pos_y-EYE_HEIGHT;
+		if(!player_hits_solid(&world,c->pos_x,c->pos_y,nz))c->pos_z=nz;
+		else if(c->grounded&&player_step_y(&world,c->pos_x,feet,nz,&step)){c->pos_y=step+EYE_HEIGHT;c->pos_z=nz;c->vel_y=0.f;}
 	}
-	if(s->fps.jump_queued&&c->grounded){c->vel_y=JUMP_SPEED;c->grounded=false;}
-	s->fps.jump_queued=false;
-
-	float previous_feet=c->pos_y-EYE_HEIGHT;
-	c->vel_y-=GRAVITY*dt;
-	c->pos_y+=c->vel_y*dt;
-	float next_feet=c->pos_y-EYE_HEIGHT;
-
-	/* The FPS camera uses the same world support surfaces as windows. A small
-	 * horizontal footprint makes platform edges feel physical without making
-	 * the player excessively wide. Only land while crossing a surface from
-	 * above, so walking below an elevated platform cannot snap us upward. */
-	struct shady_box_collider feet={
-		c->pos_x-PLAYER_RADIUS,c->pos_x+PLAYER_RADIUS,
-		next_feet,next_feet,
-		c->pos_z-PLAYER_RADIUS,c->pos_z+PLAYER_RADIUS
-	};
-	bool landed=false;
-	float support_y=0.f;
-	for(size_t i=0;i<world.collider_count;i++){
-		const struct shady_box_collider*surface=&world.colliders[i];
-		float y=surface->max_y;
-		if(c->vel_y<=0.f && previous_feet>=y && next_feet<=y &&
-				shady_box_overlap_xz(surface,&feet) &&
-				(!landed||y>support_y)){
-			support_y=y;landed=true;
-		}
-	}
-	if(landed){
-		c->pos_y=support_y+EYE_HEIGHT;
-		c->vel_y=0.f;
-		c->grounded=true;
-	}else{
-		c->grounded=false;
-	}
+	if(s->fps.jump_queued&&c->grounded){c->vel_y=JUMP_SPEED;c->grounded=false;}s->fps.jump_queued=false;
+	float previous_feet=c->pos_y-EYE_HEIGHT;c->vel_y-=GRAVITY*dt;c->pos_y+=c->vel_y*dt;float next_feet=c->pos_y-EYE_HEIGHT;
+	struct shady_box_collider feet={c->pos_x-PLAYER_RADIUS,c->pos_x+PLAYER_RADIUS,next_feet,next_feet,c->pos_z-PLAYER_RADIUS,c->pos_z+PLAYER_RADIUS};
+	bool landed=false;float support_y=0.f;
+	for(size_t i=0;i<world.collider_count;i++){const struct shady_box_collider*b=&world.colliders[i];float y=b->max_y;
+		if(c->vel_y<=0.f&&previous_feet>=y&&next_feet<=y&&shady_box_overlap_xz(b,&feet)&&(!landed||y>support_y)){support_y=y;landed=true;}}
+	if(landed){c->pos_y=support_y+EYE_HEIGHT;c->vel_y=0.f;c->grounded=true;}else c->grounded=false;
 }
 void shady_fps_update_held_window(struct shady_server*s,float lw,float lh){struct shady_toplevel*t=s->fps.held_toplevel;if(!s->camera.first_person||!t)return;struct wlr_surface*surface=t->xdg_toplevel->base->surface;if(!surface->mapped||lh<=0){s->fps.held_toplevel=NULL;return;}struct shady_vec3 eye,f;shady_camera_eye(&s->camera,&eye);shady_camera_basis(&s->camera,NULL,NULL,&f);float d=s->fps.hold_distance,hx=eye.x+f.x*d,hy=eye.y+f.y*d,hz=eye.z+f.z*d,tw=(float)surface->current.width,th=(float)surface->current.height,ww=tw/lh,wh=th/lh;
 float lx=s->fps.grab_local_x*ww,ly=s->fps.grab_local_y*wh,lz=s->fps.grab_local_z*(14.f/lh);
