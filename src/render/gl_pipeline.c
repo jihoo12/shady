@@ -135,6 +135,16 @@ static const char *FLOOR_FRAG =
 	"    gl_FragColor = vec4(base + grid * fade, 1.0);\n"
 	"}\n";
 
+static const char *DEBUG_VERT =
+	"attribute vec3 a_pos;\n"
+	"uniform mat4 u_vp;\n"
+	"void main() { gl_Position = u_vp * vec4(a_pos, 1.0); gl_Position.y = -gl_Position.y; }\n";
+
+static const char *DEBUG_FRAG =
+	"precision mediump float;\n"
+	"uniform vec4 u_color;\n"
+	"void main() { gl_FragColor = u_color; }\n";
+
 static const char *COPY_VERT =
 	"attribute vec3 a_pos;\n"
 	"varying vec2 v_uv;\n"
@@ -806,6 +816,14 @@ bool shady_gl_pipeline_init(
 	pipeline->shadow_u_softness = glGetUniformLocation(pipeline->shadow_prog, "u_softness");
 	pipeline->shadow_u_opacity = glGetUniformLocation(pipeline->shadow_prog, "u_opacity");
 
+	pipeline->debug_prog = link_program(DEBUG_VERT, DEBUG_FRAG, "debug ray");
+	if (!pipeline->debug_prog) {
+		shady_gl_pipeline_fini(pipeline);
+		return false;
+	}
+	pipeline->debug_u_vp = glGetUniformLocation(pipeline->debug_prog, "u_vp");
+	pipeline->debug_u_color = glGetUniformLocation(pipeline->debug_prog, "u_color");
+
 	wlr_log(
 		WLR_INFO,
 		"GLES2 3D window pipeline ready "
@@ -832,6 +850,10 @@ bool shady_gl_pipeline_init(
 void shady_gl_pipeline_fini(
 	struct shady_gl_pipeline *pipeline
 ) {
+	if (pipeline->debug_prog) {
+		glDeleteProgram(pipeline->debug_prog);
+		pipeline->debug_prog = 0;
+	}
 	if (pipeline->shadow_prog) {
 		glDeleteProgram(pipeline->shadow_prog);
 		pipeline->shadow_prog = 0;
@@ -1170,6 +1192,30 @@ void shady_gl_pipeline_draw_shadow(
 	glDisable(GL_POLYGON_OFFSET_FILL);
 	glDepthMask(GL_TRUE);
 	glDisable(GL_BLEND);
+	glUseProgram(0);
+}
+
+void shady_gl_pipeline_draw_debug_ray(
+		struct shady_gl_pipeline *pipeline, const float vp[16],
+		const float origin[3], const float end[3], bool hit) {
+	GLfloat line[] = { origin[0],origin[1],origin[2], end[0],end[1],end[2] };
+	glUseProgram(pipeline->debug_prog);
+	glUniformMatrix4fv(pipeline->debug_u_vp,1,GL_FALSE,vp);
+	glDisable(GL_BLEND);
+	glDepthMask(GL_FALSE);
+	glBindBuffer(GL_ARRAY_BUFFER,0);
+	glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,line);
+	glEnableVertexAttribArray(0);
+	glUniform4f(pipeline->debug_u_color,0.15f,0.95f,1.0f,1.0f);
+	glDrawArrays(GL_LINES,0,2);
+	if (hit) {
+		glUniform4f(pipeline->debug_u_color,1.0f,0.25f,0.12f,1.0f);
+		glPointSize(10.0f);
+		glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,end);
+		glDrawArrays(GL_POINTS,0,1);
+	}
+	glDisableVertexAttribArray(0);
+	glDepthMask(GL_TRUE);
 	glUseProgram(0);
 }
 

@@ -58,6 +58,7 @@ struct shady_config {
 	struct shady_keybind bind_fps_toggle;
 	struct shady_keybind bind_fps_capture;
 	struct shady_keybind bind_gravity_toggle;
+	struct shady_keybind bind_debug_ray;
 	struct shady_keybind bind_camera_left;
 	struct shady_keybind bind_camera_right;
 	struct shady_keybind bind_camera_up;
@@ -115,6 +116,7 @@ struct shady_server {
 	/* Runtime state owned by optional modules. */
 	struct shady_fps_state fps;
 	struct shady_physics_state physics;
+	bool debug_ray;
 };
 
 struct shady_output {

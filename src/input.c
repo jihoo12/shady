@@ -242,6 +242,11 @@ static bool bind_matches(const struct shady_keybind *bind,
 static bool handle_keybinding(struct shady_server *server,
 		xkb_keysym_t sym, uint32_t modifiers) {
 	struct shady_config *c = &server->config;
+	if (bind_matches(&c->bind_debug_ray, sym, modifiers)) {
+		server->debug_ray = !server->debug_ray;
+		shady_render_schedule_all_outputs(server);
+		return true;
+	}
 	if (bind_matches(&c->bind_gravity_toggle, sym, modifiers)) {
 		shady_physics_toggle_gravity(server);
 		return true;

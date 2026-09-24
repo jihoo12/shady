@@ -64,6 +64,11 @@ struct shady_gl_pipeline {
 	GLint shadow_u_wobble;
 	GLint shadow_u_softness;
 	GLint shadow_u_opacity;
+
+	/* FPS picking-ray debug overlay. */
+	GLuint debug_prog;
+	GLint debug_u_vp;
+	GLint debug_u_color;
 };
 
 bool shady_gl_pipeline_init(
@@ -108,6 +113,11 @@ void shady_gl_pipeline_draw_shadow(
 	float wobble_x,
 	float wobble_y,
 	float height
+);
+
+void shady_gl_pipeline_draw_debug_ray(
+	struct shady_gl_pipeline *pipeline,
+	const float vp[16], const float origin[3], const float end[3], bool hit
 );
 
 bool shady_gl_pipeline_copy_texture(

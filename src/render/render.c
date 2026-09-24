@@ -23,6 +23,7 @@
 #include "../shady.h"
 #include "gl_pipeline.h"
 #include "math3d.h"
+#include "pick3d.h"
 #include "../modules/physics/physics.h"
 #include "../modules/fps/fps.h"
 #include "../modules/window_motion/window_motion.h"
@@ -458,6 +459,23 @@ void shady_render_output_frame(
 		GL_FRAMEBUFFER,
 		(GLuint)fbo
 	);
+
+
+	if (server->debug_ray && server->camera.first_person) {
+		struct shady_vec3 eye, forward;
+		shady_camera_eye(&server->camera, &eye);
+		shady_camera_basis(&server->camera, NULL, NULL, &forward);
+		float distance = 0.f;
+		bool hit = shady_toplevel_at_camera_center(server, &distance) != NULL;
+		if (!hit) distance = 4.0f;
+		float origin[3] = { eye.x, eye.y, eye.z };
+		float end[3] = {
+			eye.x + forward.x * distance,
+			eye.y + forward.y * distance,
+			eye.z + forward.z * distance
+		};
+		shady_gl_pipeline_draw_debug_ray(&pipeline, vp, origin, end, hit);
+	}
 
 	glFramebufferRenderbuffer(
 		GL_FRAMEBUFFER,

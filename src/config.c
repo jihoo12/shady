@@ -24,6 +24,7 @@ void shady_config_defaults(struct shady_config *c) {
 		.bind_fps_toggle = { XKB_KEY_F2, 0 },
 		.bind_fps_capture = { XKB_KEY_F3, 0 },
 		.bind_gravity_toggle = { XKB_KEY_F4, 0 },
+		.bind_debug_ray = { XKB_KEY_F5, 0 },
 		.bind_camera_left = { XKB_KEY_Left, WLR_MODIFIER_ALT },
 		.bind_camera_right = { XKB_KEY_Right, WLR_MODIFIER_ALT },
 		.bind_camera_up = { XKB_KEY_Up, WLR_MODIFIER_ALT },
@@ -103,6 +104,7 @@ bool shady_config_load(struct shady_config *c, const char *path) {
 		BIND("fps_toggle", bind_fps_toggle)
 		BIND("fps_capture", bind_fps_capture)
 		BIND("gravity_toggle", bind_gravity_toggle)
+		BIND("debug_ray", bind_debug_ray)
 		BIND("camera_left", bind_camera_left)
 		BIND("camera_right", bind_camera_right)
 		BIND("camera_up", bind_camera_up)
