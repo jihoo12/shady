@@ -1210,9 +1210,13 @@ void shady_gl_pipeline_draw_debug_ray(
 	glDrawArrays(GL_LINES,0,2);
 	if (hit) {
 		glUniform4f(pipeline->debug_u_color,1.0f,0.25f,0.12f,1.0f);
-		glPointSize(10.0f);
-		glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,end);
-		glDrawArrays(GL_POINTS,0,1);
+		const float s = 0.018f;
+		GLfloat marker[] = {
+			end[0]-s,end[1],end[2], end[0]+s,end[1],end[2],
+			end[0],end[1]-s,end[2], end[0],end[1]+s,end[2]
+		};
+		glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,marker);
+		glDrawArrays(GL_LINES,0,4);
 	}
 	glDisableVertexAttribArray(0);
 	glDepthMask(GL_TRUE);
