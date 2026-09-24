@@ -1,1 +1,2 @@
 option('physics', type: 'feature', value: 'enabled', description: 'Build the window physics module')
+option('fps', type: 'feature', value: 'enabled', description: 'Build the first-person interaction module')

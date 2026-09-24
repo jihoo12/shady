@@ -20,6 +20,7 @@
 #include "render/pick3d.h"
 #include "render/render.h"
 #include "modules/physics/physics.h"
+#include "modules/fps/fps.h"
 
 #define CAMERA_ORBIT_SENS 0.005f
 #define CAMERA_PAN_SENS 0.0025f
@@ -32,9 +33,6 @@
 #define WINDOW_Z_STEP 0.055f
 #define WINDOW_Z_MIN -1.5f
 #define WINDOW_Z_MAX 0.75f
-#define FPS_LOOK_SENS 0.0032f
-#define FPS_HOLD_MIN 0.28f
-#define FPS_HOLD_MAX 2.50f
 
 void reset_cursor_mode(struct shady_server *server) {
 	server->cursor_mode = SHADY_CURSOR_PASSTHROUGH;
@@ -351,27 +349,10 @@ static bool handle_keybinding(struct shady_server *server,
 		shady_physics_toggle_gravity(server);
 		return true;
 	}
-	if (bind_matches(&c->bind_fps_capture, sym, modifiers) && server->camera.first_person) {
-		server->fps_input_capture = !server->fps_input_capture;
-		server->fps_forward = server->fps_back = server->fps_left = server->fps_right = false;
-		server->fps_jump_queued = false;
-		if (server->fps_input_capture) wlr_seat_pointer_clear_focus(server->seat);
-		shady_render_schedule_all_outputs(server); return true;
-	}
-	if (bind_matches(&c->bind_fps_toggle, sym, modifiers)) {
-		if (!c->fps_mode) return true;
-		server->camera.first_person = !server->camera.first_person;
-		server->fps_forward = server->fps_back = server->fps_left = server->fps_right = false;
-		server->fps_jump_queued = false; server->fps_held_toplevel = NULL;
-		server->fps_input_capture = server->camera.first_person;
-		if (server->camera.first_person) {
-			struct shady_vec3 eye; shady_camera_eye(&server->camera, &eye);
-			server->camera.pos_x=eye.x; server->camera.pos_y=eye.y; server->camera.pos_z=eye.z;
-			server->camera.vel_y=0.f; server->camera.grounded=false;
-			wlr_seat_pointer_clear_focus(server->seat);
-		}
-		shady_render_schedule_all_outputs(server); return true;
-	}
+	if (bind_matches(&c->bind_fps_capture, sym, modifiers))
+		return shady_fps_toggle_capture(server);
+	if (bind_matches(&c->bind_fps_toggle, sym, modifiers))
+		return shady_fps_toggle(server);
 	if (bind_matches(&c->bind_quit,sym,modifiers)) { wl_display_terminate(server->wl_display); return true; }
 	if (bind_matches(&c->bind_cycle_windows,sym,modifiers)) {
 		if (wl_list_length(&server->toplevels)>=2) { struct shady_toplevel *next=wl_container_of(server->toplevels.prev,next,link); focus_toplevel(next); }
@@ -416,19 +397,8 @@ static void keyboard_handle_key(
 			handled = handle_keybinding(server, syms[j], modifiers);
 	}
 
-	if (server->camera.first_person && server->fps_input_capture) {
-		bool pressed = event->state == WL_KEYBOARD_KEY_STATE_PRESSED;
-		for (int j = 0; j < nsyms; j++) {
-			switch (syms[j]) {
-			case XKB_KEY_w: case XKB_KEY_W: server->fps_forward=pressed; handled=true; break;
-			case XKB_KEY_s: case XKB_KEY_S: server->fps_back=pressed; handled=true; break;
-			case XKB_KEY_a: case XKB_KEY_A: server->fps_left=pressed; handled=true; break;
-			case XKB_KEY_d: case XKB_KEY_D: server->fps_right=pressed; handled=true; break;
-			case XKB_KEY_space: if (pressed) server->fps_jump_queued=true; handled=true; break;
-			default: break;
-			}
-		}
-	}
+	if (shady_fps_handle_key(server, syms, nsyms, event->state))
+		handled = true;
 	if (!handled) {
 		wlr_seat_set_keyboard(seat, keyboard->wlr_keyboard);
 		wlr_seat_keyboard_notify_key(seat,event->time_msec,event->keycode,event->state);
@@ -532,33 +502,8 @@ void server_cursor_motion(struct wl_listener *listener, void *data) {
 	struct shady_server *server =
 		wl_container_of(listener, server, cursor_motion);
 	struct wlr_pointer_motion_event *event = data;
-	if (server->camera.first_person && server->fps_input_capture) {
-		server->camera.yaw -= (float)event->delta_x * FPS_LOOK_SENS;
-		server->camera.pitch -= (float)event->delta_y * FPS_LOOK_SENS;
-		clamp_camera(&server->camera);
-		/*
-		 * FPS look consumes relative motion, so the wlroots cursor position
-		 * must not be allowed to remain parked at an old screen edge. Keep
-		 * the hidden logical pointer at the center while navigation capture
-		 * is active; when F3 returns control to clients the cursor therefore
-		 * reappears from a useful, predictable position.
-		 */
-		double cx = server->cursor->x, cy = server->cursor->y;
-		struct wlr_output *output =
-			wlr_output_layout_output_at(server->output_layout, cx, cy);
-		if (output) {
-			double ox = 0.0, oy = 0.0;
-			wlr_output_layout_output_coords(server->output_layout, output, &ox, &oy);
-			float scale = output->scale > 0.f ? output->scale : 1.f;
-			double lw = (double)output->width / scale;
-			double lh = (double)output->height / scale;
-			wlr_cursor_warp(server->cursor, NULL,
-				-ox + lw * 0.5, -oy + lh * 0.5);
-		}
-		wlr_seat_pointer_clear_focus(server->seat);
-		shady_render_schedule_all_outputs(server);
+	if (shady_fps_handle_motion(server, event->delta_x, event->delta_y))
 		return;
-	}
 	wlr_cursor_move(server->cursor, &event->pointer->base,
 			event->delta_x, event->delta_y);
 	process_cursor_motion(server, event->time_msec);
@@ -588,46 +533,8 @@ void server_cursor_button(struct wl_listener *listener, void *data) {
 	struct wlr_pointer_button_event *event = data;
 	uint32_t mods = seat_modifiers(server);
 
-	if (server->camera.first_person && server->fps_input_capture) {
-		if (event->button == BTN_RIGHT &&
-				event->state == WL_POINTER_BUTTON_STATE_PRESSED &&
-				server->fps_held_toplevel) {
-			struct shady_vec3 forward;
-			shady_camera_basis(&server->camera, NULL, NULL, &forward);
-			struct shady_toplevel *thrown = server->fps_held_toplevel;
-			const float throw_speed = 2.6f;
-			thrown->physics_vx = forward.x * throw_speed;
-			thrown->physics_vy = forward.y * throw_speed + server->camera.vel_y;
-			thrown->physics_vz = forward.z * throw_speed;
-			thrown->tilt_vx += -forward.y * 1.1f;
-			thrown->tilt_vy += forward.x * 0.7f;
-			thrown->wobble_vx += forward.x * 0.035f;
-			thrown->wobble_vy += forward.y * 0.035f;
-			server->fps_held_toplevel = NULL;
-			shady_render_schedule_all_outputs(server);
-			return;
-		}
-
-		if (event->button == BTN_LEFT &&
-				event->state == WL_POINTER_BUTTON_STATE_PRESSED) {
-			if (server->fps_held_toplevel) {
-				server->fps_held_toplevel = NULL;
-			} else {
-				float distance = 0.f;
-				struct shady_toplevel *hit =
-					shady_toplevel_at_camera_center(server, &distance);
-				if (hit && distance <= FPS_HOLD_MAX) {
-					server->fps_held_toplevel = hit;
-					server->fps_hold_distance = distance;
-					if (server->fps_hold_distance < FPS_HOLD_MIN)
-						server->fps_hold_distance = FPS_HOLD_MIN;
-					focus_toplevel(hit);
-				}
-			}
-			shady_render_schedule_all_outputs(server);
-		}
+	if (shady_fps_handle_button(server, event->button, event->state))
 		return;
-	}
 
 	/* Right-drag orbits. Alt+middle-drag pans (plain middle goes to clients). */
 	if (event->button == BTN_RIGHT
@@ -678,17 +585,8 @@ void server_cursor_axis(struct wl_listener *listener, void *data) {
 		wl_container_of(listener, server, cursor_axis);
 	struct wlr_pointer_axis_event *event = data;
 
-	if (server->camera.first_person && server->fps_input_capture &&
-			server->fps_held_toplevel &&
-			event->orientation == WL_POINTER_AXIS_VERTICAL_SCROLL) {
-		server->fps_hold_distance += (float)event->delta * 0.0025f;
-		if (server->fps_hold_distance < FPS_HOLD_MIN)
-			server->fps_hold_distance = FPS_HOLD_MIN;
-		if (server->fps_hold_distance > FPS_HOLD_MAX)
-			server->fps_hold_distance = FPS_HOLD_MAX;
-		shady_render_schedule_all_outputs(server);
+	if (shady_fps_handle_axis(server, event))
 		return;
-	}
 
 	uint32_t mods = seat_modifiers(server);
 

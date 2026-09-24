@@ -11,6 +11,7 @@
 
 #include "shady.h"
 #include "render/render.h"
+#include "modules/fps/fps.h"
 
 void focus_toplevel(struct shady_toplevel *toplevel) {
 	if (toplevel == NULL) {
@@ -106,9 +107,7 @@ static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 	 * unmap/destroy itself (for example after typing "exit") while it is held.
 	 * Clear it before renderer/physics can observe the stale object.
 	 */
-	if (toplevel == toplevel->server->fps_held_toplevel) {
-		toplevel->server->fps_held_toplevel = NULL;
-	}
+	shady_fps_toplevel_gone(toplevel->server, toplevel);
 	shady_render_toplevel_unmap(
 		toplevel
 	);
@@ -136,9 +135,7 @@ static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 	if (toplevel == toplevel->server->grabbed_toplevel) {
 		reset_cursor_mode(toplevel->server);
 	}
-	if (toplevel == toplevel->server->fps_held_toplevel) {
-		toplevel->server->fps_held_toplevel = NULL;
-	}
+	shady_fps_toplevel_gone(toplevel->server, toplevel);
 
 	shady_render_toplevel_destroy(
 		toplevel

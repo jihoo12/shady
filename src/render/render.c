@@ -24,6 +24,7 @@
 #include "gl_pipeline.h"
 #include "math3d.h"
 #include "../modules/physics/physics.h"
+#include "../modules/fps/fps.h"
 
 static struct shady_gl_pipeline pipeline;
 static bool pipeline_ready;
@@ -103,96 +104,6 @@ static struct wl_list close_snapshots;
 #define FPS_MOVE_SPEED 1.25f
 #define FPS_GRAVITY 3.8f
 #define FPS_JUMP_SPEED 1.45f
-
-static void update_fps_camera(struct shady_server *server, float dt) {
-	struct shady_camera *cam = &server->camera;
-	if (!cam->first_person) return;
-
-	float sy = sinf(cam->yaw);
-	float cy = cosf(cam->yaw);
-	float fx = -sy, fz = -cy;
-	float rx = cy, rz = -sy;
-	float mx = 0.f, mz = 0.f;
-	if (server->fps_forward) { mx += fx; mz += fz; }
-	if (server->fps_back) { mx -= fx; mz -= fz; }
-	if (server->fps_right) { mx += rx; mz += rz; }
-	if (server->fps_left) { mx -= rx; mz -= rz; }
-	float ml = sqrtf(mx * mx + mz * mz);
-	if (ml > 0.001f) {
-		cam->pos_x += mx / ml * FPS_MOVE_SPEED * dt;
-		cam->pos_z += mz / ml * FPS_MOVE_SPEED * dt;
-	}
-
-	if (server->fps_jump_queued && cam->grounded) {
-		cam->vel_y = FPS_JUMP_SPEED;
-		cam->grounded = false;
-	}
-	server->fps_jump_queued = false;
-	cam->vel_y -= FPS_GRAVITY * dt;
-	cam->pos_y += cam->vel_y * dt;
-
-	const float standing_y = FPS_FLOOR_Y + FPS_EYE_HEIGHT;
-	if (cam->pos_y <= standing_y) {
-		cam->pos_y = standing_y;
-		cam->vel_y = 0.f;
-		cam->grounded = true;
-	}
-}
-
-static void update_fps_held_window(
-	struct shady_server *server, float logical_w, float logical_h
-) {
-	struct shady_toplevel *toplevel = server->fps_held_toplevel;
-	if (!server->camera.first_person || !toplevel) return;
-	struct wlr_surface *surface = toplevel->xdg_toplevel->base->surface;
-	if (!surface->mapped || logical_h <= 0.f) {
-		server->fps_held_toplevel = NULL;
-		return;
-	}
-
-	struct shady_vec3 eye, forward;
-	shady_camera_eye(&server->camera, &eye);
-	shady_camera_basis(&server->camera, NULL, NULL, &forward);
-	float d = server->fps_hold_distance;
-	float cx = eye.x + forward.x * d;
-	float cy = eye.y + forward.y * d;
-	float cz = eye.z + forward.z * d;
-
-	float tw = (float)surface->current.width;
-	float th = (float)surface->current.height;
-	float world_w = tw / logical_h;
-	float world_h = th / logical_h;
-
-	/* scene node is top-left in output pixels; held point is window center. */
-	float left_world = cx - world_w * 0.5f;
-	float bottom_world = cy - world_h * 0.5f;
-	int x = (int)(left_world * logical_h + logical_w * 0.5f);
-	int y = (int)(logical_h * 0.5f - (bottom_world + world_h) * logical_h);
-	wlr_scene_node_set_position(&toplevel->scene_tree->node, x, y);
-	toplevel->z = cz;
-
-	/*
-	 * Held windows are rigidly oriented toward the FPS camera.
-	 *
-	 * The regular animation loop aggressively springs tilt back toward zero,
-	 * so feeding target values into tilt velocity made camera-facing rotation
-	 * look like another wobble. Write the orientation directly here instead:
-	 * this runs after the FPS camera update and before window animation/render.
-	 *
-	 * math3d applies Y rotation after X. The camera forward vector uses
-	 * (-sin(yaw), sin(pitch), -cos(yaw)), so the panel's +Z normal faces back
-	 * toward the camera with these angles.
-	 */
-	toplevel->tilt_x = -server->camera.pitch;
-	toplevel->tilt_y = server->camera.yaw;
-	toplevel->tilt_vx = 0.0f;
-	toplevel->tilt_vy = 0.0f;
-
-	/* Keep flexible wobble subtle while held so rigid rotation reads clearly. */
-	toplevel->wobble_vx += forward.x * 0.00045f;
-	toplevel->wobble_vy += forward.y * 0.00045f;
-}
-
 
 static float shader_time_seconds(void) {
 	struct timespec now;
@@ -887,7 +798,7 @@ void shady_render_output_frame(
 	}
 	fps_last_time = fps_now;
 	fps_clock_ready = true;
-	update_fps_camera(server, fps_dt);
+	shady_fps_update(server, fps_dt);
 	shady_physics_update(server, fps_dt, logical_w, logical_h);
 
 	/* Camera physics changed the view, so rebuild matrices for this frame. */
@@ -904,7 +815,7 @@ void shady_render_output_frame(
 	 * Apply held-window pose after the generic tilt spring. This makes the
 	 * camera-facing orientation authoritative for the current frame.
 	 */
-	update_fps_held_window(server, logical_w, logical_h);
+	shady_fps_update_held_window(server, logical_w, logical_h);
 
 	/*
 	 * Project every mapped window onto the horizontal floor before drawing

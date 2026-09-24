@@ -21,8 +21,12 @@ shady_sources = [
 ]
 
 physics_enabled = get_option('physics').enabled()
+fps_enabled = get_option('fps').enabled()
 if physics_enabled
   shady_sources += 'src/modules/physics/physics.c'
+endif
+if fps_enabled
+  shady_sources += 'src/modules/fps/fps.c'
 endif
 
 executable('shady',
@@ -32,6 +36,7 @@ executable('shady',
     '-D_POSIX_C_SOURCE=200809L',
     '-DSHADY_SHADER_DIR="@0@"'.format(shader_dir),
     '-DSHADY_HAS_PHYSICS=@0@'.format(physics_enabled ? 1 : 0),
+    '-DSHADY_HAS_FPS=@0@'.format(fps_enabled ? 1 : 0),
   ],
   include_directories: include_directories('src'),
   dependencies: [
