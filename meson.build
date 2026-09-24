@@ -22,11 +22,15 @@ shady_sources = [
 
 physics_enabled = get_option('physics').enabled()
 fps_enabled = get_option('fps').enabled()
+window_motion_enabled = get_option('window_motion').enabled()
 if physics_enabled
   shady_sources += 'src/modules/physics/physics.c'
 endif
 if fps_enabled
   shady_sources += 'src/modules/fps/fps.c'
+endif
+if window_motion_enabled
+  shady_sources += 'src/modules/window_motion/window_motion.c'
 endif
 
 executable('shady',
@@ -37,6 +41,7 @@ executable('shady',
     '-DSHADY_SHADER_DIR="@0@"'.format(shader_dir),
     '-DSHADY_HAS_PHYSICS=@0@'.format(physics_enabled ? 1 : 0),
     '-DSHADY_HAS_FPS=@0@'.format(fps_enabled ? 1 : 0),
+    '-DSHADY_HAS_WINDOW_MOTION=@0@'.format(window_motion_enabled ? 1 : 0),
   ],
   include_directories: include_directories('src'),
   dependencies: [

@@ -25,6 +25,7 @@
 #include "math3d.h"
 #include "../modules/physics/physics.h"
 #include "../modules/fps/fps.h"
+#include "../modules/window_motion/window_motion.h"
 
 static struct shady_gl_pipeline pipeline;
 static bool pipeline_ready;
@@ -161,12 +162,6 @@ static void update_window_animations(
 		dt = 0.033f;
 	}
 
-	const float SPRING =
-		42.0f;
-
-	const float DAMPING =
-		7.5f;
-
 	struct shady_toplevel *toplevel;
 
 	wl_list_for_each(
@@ -174,90 +169,7 @@ static void update_window_animations(
 		&server->toplevels,
 		link
 	) {
-		/*
-		 * --------------------------------------------------------
-		 * Existing wobble simulation
-		 * --------------------------------------------------------
-		 */
-
-		float ax =
-			-toplevel->wobble_x *
-			SPRING;
-
-		float ay =
-			-toplevel->wobble_y *
-			SPRING;
-
-		toplevel->wobble_vx +=
-			ax *
-			dt;
-
-		toplevel->wobble_vy +=
-			ay *
-			dt;
-
-		float damping =
-			1.0f -
-			DAMPING *
-			dt;
-
-		if (damping < 0.0f) {
-			damping = 0.0f;
-		}
-
-		toplevel->wobble_vx *=
-			damping;
-
-		toplevel->wobble_vy *=
-			damping;
-
-		toplevel->wobble_x +=
-			toplevel->wobble_vx *
-			dt;
-
-		toplevel->wobble_y +=
-			toplevel->wobble_vy *
-			dt;
-
-		if (
-			fabsf(toplevel->wobble_x) <
-				0.00005f &&
-			fabsf(toplevel->wobble_vx) <
-				0.00005f
-		) {
-			toplevel->wobble_x =
-				0.0f;
-
-			toplevel->wobble_vx =
-				0.0f;
-		}
-
-		if (
-			fabsf(toplevel->wobble_y) <
-				0.00005f &&
-			fabsf(toplevel->wobble_vy) <
-				0.00005f
-		) {
-			toplevel->wobble_y =
-				0.0f;
-
-			toplevel->wobble_vy =
-				0.0f;
-		}
-		/*
-		 * Rigid-body tilt inertia.
-		 *
-		 * Rotation is now a persistent part of a window's 3D transform:
-		 * releasing a window damps angular velocity, but does not spring the
-		 * orientation back to the desktop XY plane.
-		 */
-		const float TILT_DAMPING = 9.0f;
-		float tilt_damping = 1.0f - TILT_DAMPING * dt;
-		if (tilt_damping < 0.0f) tilt_damping = 0.0f;
-		toplevel->tilt_vx *= tilt_damping;
-		toplevel->tilt_vy *= tilt_damping;
-		toplevel->tilt_x += toplevel->tilt_vx * dt;
-		toplevel->tilt_y += toplevel->tilt_vy * dt;
+		shady_window_motion_update_toplevel(server, toplevel, dt);
 
 		/*
 		* --------------------------------------------------------

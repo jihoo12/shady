@@ -1,2 +1,3 @@
 option('physics', type: 'feature', value: 'enabled', description: 'Build the window physics module')
 option('fps', type: 'feature', value: 'enabled', description: 'Build the first-person interaction module')
+option('window_motion', type: 'feature', value: 'enabled', description: 'Build wobble and inertial window motion')
