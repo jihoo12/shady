@@ -109,8 +109,9 @@ struct shady_toplevel *shady_toplevel_at_3d(struct shady_server *server,
 }
 
 
-struct shady_toplevel *shady_toplevel_at_camera_center(
-		struct shady_server *server, float *distance_out) {
+struct shady_toplevel *shady_toplevel_at_camera_center_hit(
+		struct shady_server *server, float *distance_out,
+		float *hit_x, float *hit_y, float *hit_z) {
 	if (distance_out) *distance_out = 0.f;
 	struct shady_vec3 eye, forward;
 	shady_camera_eye(&server->camera, &eye);
@@ -156,6 +157,16 @@ struct shady_toplevel *shady_toplevel_at_camera_center(
 			best = toplevel;
 		}
 	}
-	if (best && distance_out) *distance_out = best_t;
+	if (best) {
+		if (distance_out) *distance_out = best_t;
+		if (hit_x) *hit_x = eye.x + forward.x * best_t;
+		if (hit_y) *hit_y = eye.y + forward.y * best_t;
+		if (hit_z) *hit_z = eye.z + forward.z * best_t;
+	}
 	return best;
+}
+
+struct shady_toplevel *shady_toplevel_at_camera_center(
+		struct shady_server *server, float *distance_out) {
+	return shady_toplevel_at_camera_center_hit(server, distance_out, NULL, NULL, NULL);
 }

@@ -7,6 +7,8 @@ struct shady_fps_state {
 	bool jump_queued;
 	struct shady_toplevel *held_toplevel;
 	float hold_distance;
+	/* World-space offset from window center to the point actually grabbed. */
+	float grab_offset_x, grab_offset_y, grab_offset_z;
 	bool input_capture;
 };
 #endif

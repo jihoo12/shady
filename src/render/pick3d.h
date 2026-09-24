@@ -12,4 +12,9 @@ struct shady_toplevel *shady_toplevel_at_3d(struct shady_server *server,
 struct shady_toplevel *shady_toplevel_at_camera_center(
 	struct shady_server *server, float *distance_out);
 
+/* Center-ray pick with the exact world-space shell hit point. */
+struct shady_toplevel *shady_toplevel_at_camera_center_hit(
+	struct shady_server *server, float *distance_out,
+	float *hit_x, float *hit_y, float *hit_z);
+
 #endif
