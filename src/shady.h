@@ -57,6 +57,7 @@ struct shady_keybind {
 };
 
 struct shady_config {
+	bool physics_enabled;
 	bool window_gravity;
 	bool window_wobble;
 	bool window_sides;

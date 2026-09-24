@@ -8,7 +8,7 @@ glesv2 = dependency('glesv2')
 
 shader_dir = join_paths(meson.project_source_root(), 'shaders')
 
-executable('shady',
+shady_sources = [
   'src/main.c',
   'src/config.c',
   'src/input.c',
@@ -18,10 +18,20 @@ executable('shady',
   'src/render/gl_pipeline.c',
   'src/render/math3d.c',
   'src/render/pick3d.c',
+]
+
+physics_enabled = get_option('physics').enabled()
+if physics_enabled
+  shady_sources += 'src/modules/physics/physics.c'
+endif
+
+executable('shady',
+  shady_sources,
   c_args: [
     '-DWLR_USE_UNSTABLE',
     '-D_POSIX_C_SOURCE=200809L',
     '-DSHADY_SHADER_DIR="@0@"'.format(shader_dir),
+    '-DSHADY_HAS_PHYSICS=@0@'.format(physics_enabled ? 1 : 0),
   ],
   include_directories: include_directories('src'),
   dependencies: [

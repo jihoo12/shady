@@ -22,6 +22,7 @@
 
 #include "shady.h"
 #include "render/render.h"
+#include "modules/physics/physics.h"
 
 static void default_config_path(char *buf, size_t size) {
 	const char *xdg = getenv("XDG_CONFIG_HOME");
@@ -69,7 +70,7 @@ int main(int argc, char *argv[]) {
 		config_path = config_buf;
 	}
 	shady_config_load(&server.config, config_path);
-	server.window_gravity = server.config.window_gravity;
+	shady_physics_init(&server);
 	server.wl_display = wl_display_create();
 	if (!server.wl_display) {
 		return 1;

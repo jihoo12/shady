@@ -19,6 +19,7 @@
 #include "render/math3d.h"
 #include "render/pick3d.h"
 #include "render/render.h"
+#include "modules/physics/physics.h"
 
 #define CAMERA_ORBIT_SENS 0.005f
 #define CAMERA_PAN_SENS 0.0025f
@@ -347,10 +348,8 @@ static bool handle_keybinding(struct shady_server *server,
 		xkb_keysym_t sym, uint32_t modifiers) {
 	struct shady_config *c = &server->config;
 	if (bind_matches(&c->bind_gravity_toggle, sym, modifiers)) {
-		server->window_gravity = !server->window_gravity;
-		struct shady_toplevel *toplevel;
-		wl_list_for_each(toplevel, &server->toplevels, link) toplevel->physics_vy = 0.f;
-		shady_render_schedule_all_outputs(server); return true;
+		shady_physics_toggle_gravity(server);
+		return true;
 	}
 	if (bind_matches(&c->bind_fps_capture, sym, modifiers) && server->camera.first_person) {
 		server->fps_input_capture = !server->fps_input_capture;

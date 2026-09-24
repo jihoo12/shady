@@ -10,6 +10,7 @@
 
 void shady_config_defaults(struct shady_config *c) {
 	*c = (struct shady_config){
+		.physics_enabled = true,
 		.window_gravity = false,
 		.window_wobble = true,
 		.window_sides = true,
@@ -115,6 +116,7 @@ bool shady_config_load(struct shady_config *c, const char *path) {
 		bool v;
 		if (!parse_bool(value,&v)) { wlr_log(WLR_ERROR,"config:%u: invalid boolean '%s'",lineno,value); continue; }
 #define KEY(name, field) if (!strcmp(key,name)) { c->field=v; continue; }
+		KEY("physics_enabled",physics_enabled)
 		KEY("window_gravity",window_gravity)
 		KEY("window_wobble",window_wobble)
 		KEY("window_sides",window_sides)

@@ -1,0 +1,1 @@
+option('physics', type: 'feature', value: 'enabled', description: 'Build the window physics module')
