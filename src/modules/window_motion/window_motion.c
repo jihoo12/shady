@@ -46,3 +46,15 @@ void shady_window_motion_add_impulse(struct shady_server *server,
 	toplevel->motion.tilt_vx += tilt_x;
 	toplevel->motion.tilt_vy += tilt_y;
 }
+
+void shady_window_motion_begin_drag(struct shady_toplevel *toplevel,double x,double y){toplevel->motion.last_move_x=x;toplevel->motion.last_move_y=y;toplevel->motion.wobble_dragging=true;}
+void shady_window_motion_drag(struct shady_server *server,struct shady_toplevel *toplevel,double x,double y){
+	double dx=x-toplevel->motion.last_move_x,dy=y-toplevel->motion.last_move_y;
+	if(!toplevel->motion.wobble_dragging){shady_window_motion_begin_drag(toplevel,x,y);return;}
+	shady_window_motion_add_impulse(server,toplevel,-(float)dx*.0065f,-(float)dy*.0065f,-(float)dy*.00055f,(float)dx*.00055f);
+	if(toplevel->motion.tilt_vx>.55f)toplevel->motion.tilt_vx=.55f;if(toplevel->motion.tilt_vx<-.55f)toplevel->motion.tilt_vx=-.55f;
+	if(toplevel->motion.tilt_vy>.55f)toplevel->motion.tilt_vy=.55f;if(toplevel->motion.tilt_vy<-.55f)toplevel->motion.tilt_vy=-.55f;
+	if(toplevel->motion.wobble_vx>.45f)toplevel->motion.wobble_vx=.45f;if(toplevel->motion.wobble_vx<-.45f)toplevel->motion.wobble_vx=-.45f;
+	if(toplevel->motion.wobble_vy>.45f)toplevel->motion.wobble_vy=.45f;if(toplevel->motion.wobble_vy<-.45f)toplevel->motion.wobble_vy=-.45f;
+	toplevel->motion.last_move_x=x;toplevel->motion.last_move_y=y;
+}

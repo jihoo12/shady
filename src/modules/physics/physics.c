@@ -49,3 +49,5 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 
 void shady_physics_set_velocity(struct shady_toplevel *toplevel,float vx,float vy,float vz){toplevel->physics.vx=vx;toplevel->physics.vy=vy;toplevel->physics.vz=vz;}
 void shady_physics_stop(struct shady_toplevel *toplevel){shady_physics_set_velocity(toplevel,0.f,0.f,0.f);}
+
+void shady_physics_move_z(struct shady_toplevel *toplevel,float delta,float min_z,float max_z){toplevel->physics.z+=delta;if(toplevel->physics.z<min_z)toplevel->physics.z=min_z;if(toplevel->physics.z>max_z)toplevel->physics.z=max_z;}
