@@ -9,6 +9,8 @@ struct shady_fps_state {
 	float hold_distance;
 	/* World-space offset from window center to the point actually grabbed. */
 	float grab_offset_x, grab_offset_y, grab_offset_z;
+	/* Grab anchor in normalized window-local coordinates, centered at 0. */
+	float grab_local_x, grab_local_y, grab_local_z;
 	bool input_capture;
 };
 #endif
