@@ -5,6 +5,7 @@
 #include <wlr/types/wlr_xdg_shell.h>
 #include "../../render/render.h"
 #include "../window_motion/window_motion.h"
+#include "../fps/fps.h"
 #define WINDOW_GRAVITY 2.8f
 #define FLOOR_Y -0.62f
 
@@ -23,7 +24,7 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 	const float restitution=.22f, friction_rate=7.f, angular_kick=.22f;
 	struct shady_toplevel *t;
 	wl_list_for_each(t,&server->toplevels,link) {
-		if(t==server->fps.held_toplevel){t->physics.vx=t->physics.vy=t->physics.vz=0.f;continue;}
+		if(shady_fps_is_holding(server,t)){shady_physics_stop(t);continue;}
 		struct wlr_surface *surface=t->xdg_toplevel->base->surface;
 		if(!surface->mapped)continue;
 		float tw=(float)surface->current.width,th=(float)surface->current.height;
