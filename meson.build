@@ -8,7 +8,7 @@ glesv2 = dependency('glesv2')
 wayland_client = dependency('wayland-client')
 wayland_protocols = dependency('wayland-protocols')
 wayland_scanner = find_program('wayland-scanner')
-protocol_dir = wayland_protocols.get_variable(pkgdatadir: 'pkgdatadir')
+protocol_dir = wayland_protocols.get_variable(pkgconfig: 'pkgdatadir')
 pointer_constraints_xml = join_paths(protocol_dir, 'unstable', 'pointer-constraints', 'pointer-constraints-unstable-v1.xml')
 pointer_constraints_header = custom_target('pointer-constraints-client-header',
   input: pointer_constraints_xml,
