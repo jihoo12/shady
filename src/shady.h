@@ -51,6 +51,18 @@ enum shady_close_state {
 
 struct shady_toplevel;
 
+struct shady_fps_state {
+	bool forward, back, left, right;
+	bool jump_queued;
+	struct shady_toplevel *held_toplevel;
+	float hold_distance;
+	bool input_capture;
+};
+
+struct shady_physics_state {
+	bool gravity_enabled;
+};
+
 struct shady_keybind {
 	xkb_keysym_t sym;
 	uint32_t modifiers;
@@ -126,19 +138,9 @@ struct shady_server {
 	float cam_grab_yaw, cam_grab_pitch;
 	float cam_grab_target_x, cam_grab_target_y, cam_grab_target_z;
 
-	/* FPS controls are compositor-owned while first-person mode is active. */
-	bool fps_forward, fps_back, fps_left, fps_right;
-	bool fps_jump_queued;
-
-	/* Window currently held by the first-person camera. */
-	struct shady_toplevel *fps_held_toplevel;
-	float fps_hold_distance;
-
-	/* F3 toggles between navigation and normal client input in FPS mode. */
-	bool fps_input_capture;
-
-	/* Runtime world setting: released windows fall onto the floor when enabled. */
-	bool window_gravity;
+	/* Runtime state owned by optional modules. */
+	struct shady_fps_state fps;
+	struct shady_physics_state physics;
 };
 
 struct shady_output {

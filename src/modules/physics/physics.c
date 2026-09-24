@@ -8,21 +8,21 @@
 #define FLOOR_Y -0.62f
 
 void shady_physics_init(struct shady_server *server) {
-	server->window_gravity=server->config.physics_enabled && server->config.window_gravity;
+	server->physics.gravity_enabled=server->config.physics_enabled && server->config.window_gravity;
 }
 void shady_physics_toggle_gravity(struct shady_server *server) {
 	if (!server->config.physics_enabled) return;
-	server->window_gravity=!server->window_gravity;
+	server->physics.gravity_enabled=!server->physics.gravity_enabled;
 	struct shady_toplevel *t;
 	wl_list_for_each(t,&server->toplevels,link) t->physics_vy=0.f;
 	shady_render_schedule_all_outputs(server);
 }
 void shady_physics_update(struct shady_server *server,float dt,float logical_w,float logical_h) {
-	if(!server->config.physics_enabled || !server->window_gravity || dt<=0.f || logical_w<=0.f || logical_h<=0.f) return;
+	if(!server->config.physics_enabled || !server->physics.gravity_enabled || dt<=0.f || logical_w<=0.f || logical_h<=0.f) return;
 	const float restitution=.22f, friction_rate=7.f, angular_kick=.22f;
 	struct shady_toplevel *t;
 	wl_list_for_each(t,&server->toplevels,link) {
-		if(t==server->fps_held_toplevel){t->physics_vx=t->physics_vy=t->physics_vz=0.f;continue;}
+		if(t==server->fps.held_toplevel){t->physics_vx=t->physics_vy=t->physics_vz=0.f;continue;}
 		struct wlr_surface *surface=t->xdg_toplevel->base->surface;
 		if(!surface->mapped)continue;
 		float tw=(float)surface->current.width,th=(float)surface->current.height;
