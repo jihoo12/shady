@@ -62,3 +62,6 @@ void shady_window_motion_drag(struct shady_server *server,struct shady_toplevel 
 	if (toplevel->motion.wobble_vy < -.45f) toplevel->motion.wobble_vy = -.45f;
 	toplevel->motion.last_move_x=x;toplevel->motion.last_move_y=y;
 }
+
+void shady_window_motion_get_tilt(const struct shady_toplevel *toplevel,float *tilt_x,float *tilt_y){if(tilt_x)*tilt_x=toplevel->motion.tilt_x;if(tilt_y)*tilt_y=toplevel->motion.tilt_y;}
+void shady_window_motion_apply_damping(struct shady_toplevel *toplevel,float factor){if(factor<0.f)factor=0.f;toplevel->motion.tilt_vx*=factor;toplevel->motion.tilt_vy*=factor;}
