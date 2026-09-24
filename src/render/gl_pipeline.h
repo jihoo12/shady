@@ -115,6 +115,10 @@ void shady_gl_pipeline_draw_shadow(
 	float height
 );
 
+void shady_gl_pipeline_draw_crosshair(
+	struct shady_gl_pipeline *pipeline, bool target, bool holding
+);
+
 void shady_gl_pipeline_draw_debug_ray(
 	struct shady_gl_pipeline *pipeline,
 	const float vp[16], const float origin[3], const float end[3], bool hit

@@ -808,6 +808,13 @@ void shady_render_output_frame(
 	}
 
 
+	if (server->camera.first_person) {
+		float cross_distance = 0.f;
+		bool cross_target = shady_toplevel_at_camera_center(server, &cross_distance) != NULL;
+		shady_gl_pipeline_draw_crosshair(&pipeline, cross_target,
+			shady_fps_is_holding(server, NULL) ? false : server->fps.held_toplevel != NULL);
+	}
+
 	if (server->debug_ray && server->camera.first_person) {
 		struct shady_vec3 eye, forward;
 		shady_camera_eye(&server->camera, &eye);

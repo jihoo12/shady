@@ -1195,6 +1195,31 @@ void shady_gl_pipeline_draw_shadow(
 	glUseProgram(0);
 }
 
+void shady_gl_pipeline_draw_crosshair(
+		struct shady_gl_pipeline *pipeline, bool target, bool holding) {
+	/* Screen-space reticle: independent from the host cursor and camera depth. */
+	const float sx = holding ? 0.018f : 0.012f;
+	const float sy = sx * 1.78f; /* approximate 16:9 so it looks square-ish */
+	GLfloat v[] = { -sx,0.f,0.f, sx,0.f,0.f, 0.f,-sy,0.f, 0.f,sy,0.f };
+	glUseProgram(pipeline->debug_prog);
+	float ident[16] = {1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1};
+	glUniformMatrix4fv(pipeline->debug_u_vp,1,GL_FALSE,ident);
+	if (holding) glUniform4f(pipeline->debug_u_color,1.0f,0.72f,0.18f,1.0f);
+	else if (target) glUniform4f(pipeline->debug_u_color,1.0f,0.25f,0.12f,1.0f);
+	else glUniform4f(pipeline->debug_u_color,0.75f,0.88f,1.0f,1.0f);
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_BLEND);
+	glDepthMask(GL_FALSE);
+	glBindBuffer(GL_ARRAY_BUFFER,0);
+	glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,v);
+	glEnableVertexAttribArray(0);
+	glDrawArrays(GL_LINES,0,4);
+	glDisableVertexAttribArray(0);
+	glDepthMask(GL_TRUE);
+	glEnable(GL_DEPTH_TEST);
+	glUseProgram(0);
+}
+
 void shady_gl_pipeline_draw_debug_ray(
 		struct shady_gl_pipeline *pipeline, const float vp[16],
 		const float origin[3], const float end[3], bool hit) {
