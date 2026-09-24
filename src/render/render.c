@@ -29,6 +29,7 @@
 #include "../modules/window_motion/window_motion.h"
 #include "../modules/close_animation/close_animation.h"
 #include "../modules/scene_effects/scene_effects.h"
+#include "../modules/environment/environment.h"
 
 static struct shady_gl_pipeline pipeline;
 static bool pipeline_ready;
@@ -236,6 +237,7 @@ bool shady_render_init(
 			&pipeline,
 			renderer
 		);
+	if (pipeline_ready) shady_environment_init(&pipeline);
 
 	depth_rbo = 0;
 	depth_rbo_w = 0;
@@ -267,6 +269,7 @@ void shady_render_fini(void) {
 	}
 
 	if (pipeline_ready) {
+		shady_environment_fini();
 		shady_gl_pipeline_fini(
 			&pipeline
 		);
@@ -516,6 +519,8 @@ void shady_render_output_frame(
 		proj,
 		view
 	);
+
+	shady_environment_draw(server, &pipeline, view, proj);
 
 	/*
 	 * Draw a world-space reference plane before windows. Because it shares

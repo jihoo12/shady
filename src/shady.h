@@ -51,6 +51,8 @@ struct shady_config {
 	bool floor;
 	bool close_animation;
 	bool fps_mode;
+	bool sky;
+	char sky_path[512];
 
 	struct shady_keybind bind_quit;
 	struct shady_keybind bind_cycle_windows;
