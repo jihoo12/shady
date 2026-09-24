@@ -51,6 +51,11 @@ enum shady_close_state {
 
 struct shady_toplevel;
 
+struct shady_keybind {
+	xkb_keysym_t sym;
+	uint32_t modifiers;
+};
+
 struct shady_config {
 	bool window_gravity;
 	bool window_wobble;
@@ -59,6 +64,22 @@ struct shady_config {
 	bool floor;
 	bool close_animation;
 	bool fps_mode;
+
+	struct shady_keybind bind_quit;
+	struct shady_keybind bind_cycle_windows;
+	struct shady_keybind bind_close_window;
+	struct shady_keybind bind_fps_toggle;
+	struct shady_keybind bind_fps_capture;
+	struct shady_keybind bind_gravity_toggle;
+	struct shady_keybind bind_camera_left;
+	struct shady_keybind bind_camera_right;
+	struct shady_keybind bind_camera_up;
+	struct shady_keybind bind_camera_down;
+	struct shady_keybind bind_camera_yaw_left;
+	struct shady_keybind bind_camera_yaw_right;
+	struct shady_keybind bind_camera_zoom_in;
+	struct shady_keybind bind_camera_zoom_out;
+	struct shady_keybind bind_camera_reset;
 };
 
 struct shady_server {

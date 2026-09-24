@@ -183,3 +183,31 @@ Boolean values accept `true/false`, `yes/no`, `on/off`, or `1/0`.
 Unknown keys and invalid values are reported in the log and ignored. Missing
 configuration files are fine; built-in defaults are used. Settings are loaded
 at startup, so restart Shady after editing the file.
+
+
+### Key bindings
+
+Keyboard shortcuts can use the same configuration file. A binding is written as
+`bind.action = Mod+Key`. Supported modifiers are `Alt`, `Shift`, `Ctrl`,
+and `Super`; key names are XKB names.
+
+```ini
+bind.quit = Escape
+bind.cycle_windows = F1
+bind.close_window = Alt+F11
+bind.fps_toggle = F2
+bind.fps_capture = F3
+bind.gravity_toggle = F4
+bind.camera_left = Alt+Left
+bind.camera_right = Alt+Right
+bind.camera_up = Alt+Up
+bind.camera_down = Alt+Down
+bind.camera_yaw_left = Alt+q
+bind.camera_yaw_right = Alt+e
+bind.camera_zoom_in = Alt+equal
+bind.camera_zoom_out = Alt+minus
+bind.camera_reset = Alt+0
+```
+
+These values are the built-in defaults, so existing configurations keep the
+current controls unless a binding is overridden.

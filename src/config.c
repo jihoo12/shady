@@ -6,6 +6,7 @@
 #include <string.h>
 #include <strings.h>
 #include <wlr/util/log.h>
+#include <wlr/types/wlr_keyboard.h>
 
 void shady_config_defaults(struct shady_config *c) {
 	*c = (struct shady_config){
@@ -16,6 +17,21 @@ void shady_config_defaults(struct shady_config *c) {
 		.floor = true,
 		.close_animation = true,
 		.fps_mode = true,
+		.bind_quit = { XKB_KEY_Escape, 0 },
+		.bind_cycle_windows = { XKB_KEY_F1, 0 },
+		.bind_close_window = { XKB_KEY_F11, WLR_MODIFIER_ALT },
+		.bind_fps_toggle = { XKB_KEY_F2, 0 },
+		.bind_fps_capture = { XKB_KEY_F3, 0 },
+		.bind_gravity_toggle = { XKB_KEY_F4, 0 },
+		.bind_camera_left = { XKB_KEY_Left, WLR_MODIFIER_ALT },
+		.bind_camera_right = { XKB_KEY_Right, WLR_MODIFIER_ALT },
+		.bind_camera_up = { XKB_KEY_Up, WLR_MODIFIER_ALT },
+		.bind_camera_down = { XKB_KEY_Down, WLR_MODIFIER_ALT },
+		.bind_camera_yaw_left = { XKB_KEY_q, WLR_MODIFIER_ALT },
+		.bind_camera_yaw_right = { XKB_KEY_e, WLR_MODIFIER_ALT },
+		.bind_camera_zoom_in = { XKB_KEY_equal, WLR_MODIFIER_ALT },
+		.bind_camera_zoom_out = { XKB_KEY_minus, WLR_MODIFIER_ALT },
+		.bind_camera_reset = { XKB_KEY_0, WLR_MODIFIER_ALT },
 	};
 }
 
@@ -31,6 +47,32 @@ static bool parse_bool(const char *s, bool *out) {
 	if (!strcasecmp(s,"true") || !strcasecmp(s,"yes") || !strcasecmp(s,"on") || !strcmp(s,"1")) { *out=true; return true; }
 	if (!strcasecmp(s,"false") || !strcasecmp(s,"no") || !strcasecmp(s,"off") || !strcmp(s,"0")) { *out=false; return true; }
 	return false;
+}
+
+
+static bool parse_keybind(const char *s, struct shady_keybind *out) {
+	char buf[128];
+	if (strlen(s) >= sizeof(buf)) return false;
+	strcpy(buf, s);
+	uint32_t mods = 0;
+	char *save = NULL, *token = strtok_r(buf, "+", &save), *key = NULL;
+	while (token) {
+		token = trim(token);
+		if (!strcasecmp(token, "Alt")) mods |= WLR_MODIFIER_ALT;
+		else if (!strcasecmp(token, "Shift")) mods |= WLR_MODIFIER_SHIFT;
+		else if (!strcasecmp(token, "Ctrl") || !strcasecmp(token, "Control")) mods |= WLR_MODIFIER_CTRL;
+		else if (!strcasecmp(token, "Super") || !strcasecmp(token, "Logo")) mods |= WLR_MODIFIER_LOGO;
+		else {
+			if (key) return false;
+			key = token;
+		}
+		token = strtok_r(NULL, "+", &save);
+	}
+	if (!key || !*key) return false;
+	xkb_keysym_t sym = xkb_keysym_from_name(key, XKB_KEYSYM_CASE_INSENSITIVE);
+	if (sym == XKB_KEY_NoSymbol) return false;
+	*out = (struct shady_keybind){ .sym = sym, .modifiers = mods };
+	return true;
 }
 
 bool shady_config_load(struct shady_config *c, const char *path) {
@@ -50,6 +92,26 @@ bool shady_config_load(struct shady_config *c, const char *path) {
 		*eq='\0'; char *key=trim(p), *value=trim(eq+1);
 		char *comment=strpbrk(value,"#;");
 		if (comment) { *comment='\0'; value=trim(value); }
+#define BIND(name, field) if (!strcmp(key, "bind." name)) { \
+			if (!parse_keybind(value, &c->field)) wlr_log(WLR_ERROR, "config:%u: invalid keybind '%s'", lineno, value); \
+			continue; \
+		}
+		BIND("quit", bind_quit)
+		BIND("cycle_windows", bind_cycle_windows)
+		BIND("close_window", bind_close_window)
+		BIND("fps_toggle", bind_fps_toggle)
+		BIND("fps_capture", bind_fps_capture)
+		BIND("gravity_toggle", bind_gravity_toggle)
+		BIND("camera_left", bind_camera_left)
+		BIND("camera_right", bind_camera_right)
+		BIND("camera_up", bind_camera_up)
+		BIND("camera_down", bind_camera_down)
+		BIND("camera_yaw_left", bind_camera_yaw_left)
+		BIND("camera_yaw_right", bind_camera_yaw_right)
+		BIND("camera_zoom_in", bind_camera_zoom_in)
+		BIND("camera_zoom_out", bind_camera_zoom_out)
+		BIND("camera_reset", bind_camera_reset)
+#undef BIND
 		bool v;
 		if (!parse_bool(value,&v)) { wlr_log(WLR_ERROR,"config:%u: invalid boolean '%s'",lineno,value); continue; }
 #define KEY(name, field) if (!strcmp(key,name)) { c->field=v; continue; }

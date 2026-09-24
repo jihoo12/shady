@@ -336,147 +336,63 @@ static void begin_close_animation(
 	);
 }
 
-static bool handle_keybinding(struct shady_server *server, xkb_keysym_t sym) {
-	if (sym == XKB_KEY_F4) {
+static bool bind_matches(const struct shady_keybind *bind,
+		xkb_keysym_t sym, uint32_t modifiers) {
+	const uint32_t mask = WLR_MODIFIER_ALT | WLR_MODIFIER_SHIFT |
+		WLR_MODIFIER_CTRL | WLR_MODIFIER_LOGO;
+	return bind->sym == sym && bind->modifiers == (modifiers & mask);
+}
+
+static bool handle_keybinding(struct shady_server *server,
+		xkb_keysym_t sym, uint32_t modifiers) {
+	struct shady_config *c = &server->config;
+	if (bind_matches(&c->bind_gravity_toggle, sym, modifiers)) {
 		server->window_gravity = !server->window_gravity;
 		struct shady_toplevel *toplevel;
-		wl_list_for_each(toplevel, &server->toplevels, link) {
-			toplevel->physics_vy = 0.0f;
-		}
-		shady_render_schedule_all_outputs(server);
-		return true;
+		wl_list_for_each(toplevel, &server->toplevels, link) toplevel->physics_vy = 0.f;
+		shady_render_schedule_all_outputs(server); return true;
 	}
-
-	if (sym == XKB_KEY_F3 && server->camera.first_person) {
+	if (bind_matches(&c->bind_fps_capture, sym, modifiers) && server->camera.first_person) {
 		server->fps_input_capture = !server->fps_input_capture;
-		server->fps_forward = server->fps_back = false;
-		server->fps_left = server->fps_right = false;
+		server->fps_forward = server->fps_back = server->fps_left = server->fps_right = false;
 		server->fps_jump_queued = false;
-		if (server->fps_input_capture) {
-			/* Recenter immediately as capture begins, not only after motion. */
-			struct wlr_output *output = wlr_output_layout_output_at(
-				server->output_layout, server->cursor->x, server->cursor->y);
-			if (output) {
-				double ox = 0.0, oy = 0.0;
-				wlr_output_layout_output_coords(server->output_layout, output, &ox, &oy);
-				float scale = output->scale > 0.f ? output->scale : 1.f;
-				wlr_cursor_warp(server->cursor, NULL,
-					-ox + ((double)output->width / scale) * 0.5,
-					-oy + ((double)output->height / scale) * 0.5);
-			}
-			wlr_seat_pointer_clear_focus(server->seat);
-		}
-		shady_render_schedule_all_outputs(server);
-		return true;
+		if (server->fps_input_capture) wlr_seat_pointer_clear_focus(server->seat);
+		shady_render_schedule_all_outputs(server); return true;
 	}
-
-	if (sym == XKB_KEY_F2) {
-		if (!server->config.fps_mode) return true;
+	if (bind_matches(&c->bind_fps_toggle, sym, modifiers)) {
+		if (!c->fps_mode) return true;
 		server->camera.first_person = !server->camera.first_person;
-		server->fps_forward = server->fps_back = false;
-		server->fps_left = server->fps_right = false;
-		server->fps_jump_queued = false;
-		server->fps_held_toplevel = NULL;
+		server->fps_forward = server->fps_back = server->fps_left = server->fps_right = false;
+		server->fps_jump_queued = false; server->fps_held_toplevel = NULL;
 		server->fps_input_capture = server->camera.first_person;
 		if (server->camera.first_person) {
-			struct shady_vec3 eye;
-			shady_camera_eye(&server->camera, &eye);
-			server->camera.pos_x = eye.x;
-			server->camera.pos_y = eye.y;
-			server->camera.pos_z = eye.z;
-			server->camera.vel_y = 0.f;
-			server->camera.grounded = false;
+			struct shady_vec3 eye; shady_camera_eye(&server->camera, &eye);
+			server->camera.pos_x=eye.x; server->camera.pos_y=eye.y; server->camera.pos_z=eye.z;
+			server->camera.vel_y=0.f; server->camera.grounded=false;
 			wlr_seat_pointer_clear_focus(server->seat);
 		}
-		shady_render_schedule_all_outputs(server);
+		shady_render_schedule_all_outputs(server); return true;
+	}
+	if (bind_matches(&c->bind_quit,sym,modifiers)) { wl_display_terminate(server->wl_display); return true; }
+	if (bind_matches(&c->bind_cycle_windows,sym,modifiers)) {
+		if (wl_list_length(&server->toplevels)>=2) { struct shady_toplevel *next=wl_container_of(server->toplevels.prev,next,link); focus_toplevel(next); }
 		return true;
 	}
-
-	bool camera_changed = false;
-	struct shady_vec3 right, up, forward;
-
-	switch (sym) {
-	case XKB_KEY_Escape:
-		wl_display_terminate(server->wl_display);
-		break;
-	case XKB_KEY_F1:
-		if (wl_list_length(&server->toplevels) < 2) {
-			break;
-		}
-		struct shady_toplevel *next_toplevel =
-			wl_container_of(server->toplevels.prev, next_toplevel, link);
-		focus_toplevel(next_toplevel);
-		break;
-	case XKB_KEY_F11:
-		begin_close_animation(server);
-		break;
-	case XKB_KEY_Left:
-	case XKB_KEY_a:
-	case XKB_KEY_A:
-		shady_camera_basis(&server->camera, &right, &up, &forward);
-		server->camera.target_x -= right.x * CAMERA_KEY_PAN;
-		server->camera.target_y -= right.y * CAMERA_KEY_PAN;
-		server->camera.target_z -= right.z * CAMERA_KEY_PAN;
-		camera_changed = true;
-		break;
-	case XKB_KEY_Right:
-	case XKB_KEY_d:
-	case XKB_KEY_D:
-		shady_camera_basis(&server->camera, &right, &up, &forward);
-		server->camera.target_x += right.x * CAMERA_KEY_PAN;
-		server->camera.target_y += right.y * CAMERA_KEY_PAN;
-		server->camera.target_z += right.z * CAMERA_KEY_PAN;
-		camera_changed = true;
-		break;
-	case XKB_KEY_Up:
-	case XKB_KEY_w:
-	case XKB_KEY_W:
-		shady_camera_basis(&server->camera, &right, &up, &forward);
-		server->camera.target_x += up.x * CAMERA_KEY_PAN;
-		server->camera.target_y += up.y * CAMERA_KEY_PAN;
-		server->camera.target_z += up.z * CAMERA_KEY_PAN;
-		camera_changed = true;
-		break;
-	case XKB_KEY_Down:
-	case XKB_KEY_s:
-	case XKB_KEY_S:
-		shady_camera_basis(&server->camera, &right, &up, &forward);
-		server->camera.target_x -= up.x * CAMERA_KEY_PAN;
-		server->camera.target_y -= up.y * CAMERA_KEY_PAN;
-		server->camera.target_z -= up.z * CAMERA_KEY_PAN;
-		camera_changed = true;
-		break;
-	case XKB_KEY_q:
-	case XKB_KEY_Q:
-		server->camera.yaw += CAMERA_KEY_ORBIT;
-		camera_changed = true;
-		break;
-	case XKB_KEY_e:
-	case XKB_KEY_E:
-		server->camera.yaw -= CAMERA_KEY_ORBIT;
-		camera_changed = true;
-		break;
-	case XKB_KEY_equal:
-	case XKB_KEY_plus:
-		server->camera.distance -= CAMERA_ZOOM_STEP;
-		camera_changed = true;
-		break;
-	case XKB_KEY_minus:
-		server->camera.distance += CAMERA_ZOOM_STEP;
-		camera_changed = true;
-		break;
-	case XKB_KEY_0:
-		shady_camera_reset(&server->camera);
-		camera_changed = true;
-		break;
-	default:
-		return false;
-	}
-
-	if (camera_changed) {
-		clamp_camera(&server->camera);
-		shady_render_schedule_all_outputs(server);
-	}
+	if (bind_matches(&c->bind_close_window,sym,modifiers)) { begin_close_animation(server); return true; }
+	bool changed=false; struct shady_vec3 right,up,forward;
+	if (bind_matches(&c->bind_camera_left,sym,modifiers) || bind_matches(&c->bind_camera_right,sym,modifiers) ||
+		bind_matches(&c->bind_camera_up,sym,modifiers) || bind_matches(&c->bind_camera_down,sym,modifiers)) {
+		shady_camera_basis(&server->camera,&right,&up,&forward);
+		float sign = (bind_matches(&c->bind_camera_left,sym,modifiers)||bind_matches(&c->bind_camera_down,sym,modifiers)) ? -1.f : 1.f;
+		struct shady_vec3 v = (bind_matches(&c->bind_camera_left,sym,modifiers)||bind_matches(&c->bind_camera_right,sym,modifiers)) ? right : up;
+		server->camera.target_x += v.x*CAMERA_KEY_PAN*sign; server->camera.target_y += v.y*CAMERA_KEY_PAN*sign; server->camera.target_z += v.z*CAMERA_KEY_PAN*sign; changed=true;
+	} else if (bind_matches(&c->bind_camera_yaw_left,sym,modifiers)) { server->camera.yaw += CAMERA_KEY_ORBIT; changed=true;
+	} else if (bind_matches(&c->bind_camera_yaw_right,sym,modifiers)) { server->camera.yaw -= CAMERA_KEY_ORBIT; changed=true;
+	} else if (bind_matches(&c->bind_camera_zoom_in,sym,modifiers)) { server->camera.distance -= CAMERA_ZOOM_STEP; changed=true;
+	} else if (bind_matches(&c->bind_camera_zoom_out,sym,modifiers)) { server->camera.distance += CAMERA_ZOOM_STEP; changed=true;
+	} else if (bind_matches(&c->bind_camera_reset,sym,modifiers)) { shady_camera_reset(&server->camera); changed=true;
+	} else return false;
+	if (changed) { clamp_camera(&server->camera); shady_render_schedule_all_outputs(server); }
 	return true;
 }
 
@@ -496,43 +412,27 @@ static void keyboard_handle_key(
 	bool handled = false;
 	uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->wlr_keyboard);
 
-	/* F2 changes camera mode; F3 releases/captures FPS controls for typing. */
 	if (event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
-		for (int j = 0; j < nsyms; j++) {
-			if (syms[j] == XKB_KEY_F2 || syms[j] == XKB_KEY_F3 ||
-					syms[j] == XKB_KEY_F4)
-				handled = handle_keybinding(server, syms[j]);
-		}
+		for (int j = 0; j < nsyms && !handled; j++)
+			handled = handle_keybinding(server, syms[j], modifiers);
 	}
 
 	if (server->camera.first_person && server->fps_input_capture) {
 		bool pressed = event->state == WL_KEYBOARD_KEY_STATE_PRESSED;
 		for (int j = 0; j < nsyms; j++) {
 			switch (syms[j]) {
-			case XKB_KEY_w: case XKB_KEY_W: server->fps_forward = pressed; handled = true; break;
-			case XKB_KEY_s: case XKB_KEY_S: server->fps_back = pressed; handled = true; break;
-			case XKB_KEY_a: case XKB_KEY_A: server->fps_left = pressed; handled = true; break;
-			case XKB_KEY_d: case XKB_KEY_D: server->fps_right = pressed; handled = true; break;
-			case XKB_KEY_space:
-				if (pressed) server->fps_jump_queued = true;
-				handled = true;
-				break;
+			case XKB_KEY_w: case XKB_KEY_W: server->fps_forward=pressed; handled=true; break;
+			case XKB_KEY_s: case XKB_KEY_S: server->fps_back=pressed; handled=true; break;
+			case XKB_KEY_a: case XKB_KEY_A: server->fps_left=pressed; handled=true; break;
+			case XKB_KEY_d: case XKB_KEY_D: server->fps_right=pressed; handled=true; break;
+			case XKB_KEY_space: if (pressed) server->fps_jump_queued=true; handled=true; break;
 			default: break;
 			}
 		}
 	}
-
-	if (!handled && (modifiers & WLR_MODIFIER_ALT) &&
-			event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
-		for (int j = 0; j < nsyms; j++) {
-			handled = handle_keybinding(server, syms[j]);
-		}
-	}
-
 	if (!handled) {
 		wlr_seat_set_keyboard(seat, keyboard->wlr_keyboard);
-		wlr_seat_keyboard_notify_key(seat, event->time_msec,
-			event->keycode, event->state);
+		wlr_seat_keyboard_notify_key(seat,event->time_msec,event->keycode,event->state);
 	}
 }
 
