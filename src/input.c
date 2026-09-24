@@ -411,6 +411,10 @@ void server_cursor_motion_absolute(
 	struct shady_server *server =
 		wl_container_of(listener, server, cursor_motion_absolute);
 	struct wlr_pointer_motion_absolute_event *event = data;
+	if (server->camera.first_person && server->fps.input_capture) {
+		shady_fps_handle_motion(server, 0.0, 0.0);
+		return;
+	}
 	wlr_cursor_warp_absolute(server->cursor, &event->pointer->base, event->x,
 		event->y);
 	process_cursor_motion(server, event->time_msec);
