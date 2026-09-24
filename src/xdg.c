@@ -101,6 +101,14 @@ static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 	if (toplevel == toplevel->server->grabbed_toplevel) {
 		reset_cursor_mode(toplevel->server);
 	}
+	/*
+	 * FPS carry state is a raw pointer into the toplevel object. A client may
+	 * unmap/destroy itself (for example after typing "exit") while it is held.
+	 * Clear it before renderer/physics can observe the stale object.
+	 */
+	if (toplevel == toplevel->server->fps_held_toplevel) {
+		toplevel->server->fps_held_toplevel = NULL;
+	}
 	shady_render_toplevel_unmap(
 		toplevel
 	);
@@ -123,6 +131,14 @@ static void xdg_toplevel_commit(struct wl_listener *listener, void *data) {
 static void xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
 	(void)data;
 	struct shady_toplevel *toplevel = wl_container_of(listener, toplevel, destroy);
+
+	/* Be defensive if destroy arrives without the normal unmap path. */
+	if (toplevel == toplevel->server->grabbed_toplevel) {
+		reset_cursor_mode(toplevel->server);
+	}
+	if (toplevel == toplevel->server->fps_held_toplevel) {
+		toplevel->server->fps_held_toplevel = NULL;
+	}
 
 	shady_render_toplevel_destroy(
 		toplevel
