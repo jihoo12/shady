@@ -23,7 +23,6 @@
 #include "shady.h"
 #include "render/render.h"
 #include "modules/physics/physics.h"
-#include "modules/fps/fps.h"
 
 static void default_config_path(char *buf, size_t size) {
 	const char *xdg = getenv("XDG_CONFIG_HOME");
@@ -88,7 +87,6 @@ int main(int argc, char *argv[]) {
 		wlr_log(WLR_ERROR, "failed to create wlr_backend");
 		return 1;
 	}
-	shady_fps_host_init(&server);
 
 	server.renderer = wlr_renderer_autocreate(server.backend);
 	if (server.renderer == NULL) {
@@ -223,7 +221,6 @@ int main(int argc, char *argv[]) {
 	wl_list_remove(&server.new_output.link);
 
 	shady_render_fini();
-	shady_fps_host_finish(&server);
 
 	wl_event_source_remove(sigint);
 	wl_event_source_remove(sigterm);
