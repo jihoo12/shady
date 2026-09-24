@@ -11,6 +11,7 @@
 #include <EGL/egl.h>
 #include <GLES2/gl2ext.h>
 #include "../world/floor.h"
+#include "../world/platform.h"
 
 #ifndef SHADY_SHADER_DIR
 #define SHADY_SHADER_DIR "shaders"
@@ -543,6 +544,25 @@ static bool create_floor_mesh(struct shady_gl_pipeline *pipeline) {
 	return pipeline->floor_vbo != 0;
 }
 
+static bool create_platform_mesh(struct shady_gl_pipeline *pipeline) {
+	struct shady_box_collider b=shady_world_test_platform();
+#define V(x,y,z) (x),(y),(z)
+	GLfloat v[] = {
+		/* top */ V(b.min_x,b.max_y,b.min_z),V(b.max_x,b.max_y,b.min_z),V(b.min_x,b.max_y,b.max_z), V(b.min_x,b.max_y,b.max_z),V(b.max_x,b.max_y,b.min_z),V(b.max_x,b.max_y,b.max_z),
+		/* front/back */ V(b.min_x,b.min_y,b.min_z),V(b.max_x,b.min_y,b.min_z),V(b.min_x,b.max_y,b.min_z), V(b.min_x,b.max_y,b.min_z),V(b.max_x,b.min_y,b.min_z),V(b.max_x,b.max_y,b.min_z),
+		V(b.max_x,b.min_y,b.max_z),V(b.min_x,b.min_y,b.max_z),V(b.max_x,b.max_y,b.max_z), V(b.max_x,b.max_y,b.max_z),V(b.min_x,b.min_y,b.max_z),V(b.min_x,b.max_y,b.max_z),
+		/* left/right */ V(b.min_x,b.min_y,b.max_z),V(b.min_x,b.min_y,b.min_z),V(b.min_x,b.max_y,b.max_z), V(b.min_x,b.max_y,b.max_z),V(b.min_x,b.min_y,b.min_z),V(b.min_x,b.max_y,b.min_z),
+		V(b.max_x,b.min_y,b.min_z),V(b.max_x,b.min_y,b.max_z),V(b.max_x,b.max_y,b.min_z), V(b.max_x,b.max_y,b.min_z),V(b.max_x,b.min_y,b.max_z),V(b.max_x,b.max_y,b.max_z)
+	};
+#undef V
+	glGenBuffers(1,&pipeline->platform_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER,pipeline->platform_vbo);
+	glBufferData(GL_ARRAY_BUFFER,sizeof(v),v,GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER,0);
+	pipeline->platform_vertex_count=(GLsizei)(sizeof(v)/(3*sizeof(GLfloat)));
+	return pipeline->platform_vbo!=0;
+}
+
 static bool create_side_mesh(struct shady_gl_pipeline *pipeline) {
 	/*
 	 * Four subdivided walls of a unit box. Subdivision lets the perimeter
@@ -810,6 +830,7 @@ bool shady_gl_pipeline_init(
 		return false;
 	}
 	pipeline->floor_u_vp = glGetUniformLocation(pipeline->floor_prog, "u_vp");
+	if (!create_platform_mesh(pipeline)) { shady_gl_pipeline_fini(pipeline); return false; }
 
 	pipeline->shadow_prog = link_program(SHADOW_VERT, SHADOW_FRAG, "window shadow");
 	if (!pipeline->shadow_prog) {
@@ -865,6 +886,7 @@ void shady_gl_pipeline_fini(
 		glDeleteProgram(pipeline->shadow_prog);
 		pipeline->shadow_prog = 0;
 	}
+	if (pipeline->platform_vbo) { glDeleteBuffers(1,&pipeline->platform_vbo); pipeline->platform_vbo=0; pipeline->platform_vertex_count=0; }
 	if (pipeline->floor_vbo) {
 		glDeleteBuffers(1, &pipeline->floor_vbo);
 		pipeline->floor_vbo = 0;
@@ -1156,6 +1178,21 @@ void shady_gl_pipeline_draw_floor(
 	glDisableVertexAttribArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glUseProgram(0);
+}
+
+void shady_gl_pipeline_draw_platform(
+	struct shady_gl_pipeline *pipeline,const float vp[16],
+	const struct shady_box_collider *box) {
+	(void)box;
+	glUseProgram(pipeline->floor_prog);
+	glUniformMatrix4fv(pipeline->floor_u_vp,1,GL_FALSE,vp);
+	glDisable(GL_BLEND); glDepthMask(GL_TRUE);
+	glBindBuffer(GL_ARRAY_BUFFER,pipeline->platform_vbo);
+	glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,3*sizeof(GLfloat),(void*)0);
+	glEnableVertexAttribArray(0);
+	glDrawArrays(GL_TRIANGLES,0,pipeline->platform_vertex_count);
+	glDisableVertexAttribArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER,0); glUseProgram(0);
 }
 
 void shady_gl_pipeline_draw_shadow(

@@ -4,6 +4,7 @@
 #include <GLES2/gl2.h>
 #include <stdbool.h>
 #include "../world/floor.h"
+#include "../world/collider.h"
 
 struct wlr_renderer;
 
@@ -57,6 +58,8 @@ struct shady_gl_pipeline {
 	GLint floor_u_vp;
 	GLuint floor_vbo;
 	GLsizei floor_vertex_count;
+	GLuint platform_vbo;
+	GLsizei platform_vertex_count;
 
 	/* Projected window silhouettes on the horizontal floor. */
 	GLuint shadow_prog;
@@ -107,6 +110,12 @@ void shady_gl_pipeline_draw_floor(
 	struct shady_gl_pipeline *pipeline,
 	const float vp[16],
 	const struct shady_floor *floor
+);
+
+void shady_gl_pipeline_draw_platform(
+	struct shady_gl_pipeline *pipeline,
+	const float vp[16],
+	const struct shady_box_collider *box
 );
 
 void shady_gl_pipeline_draw_shadow(
