@@ -656,7 +656,7 @@ void shady_render_output_frame(
 		float mvp[16];
 
 		if (
-			toplevel->close_state ==
+			toplevel->close.state ==
 			SHADY_CLOSE_ARMED
 		) {
 			struct shady_close_snapshot *snapshot =
@@ -696,11 +696,11 @@ void shady_render_output_frame(
 						(float)toplevel->scene_tree->node.y;
 					snapshot->width = tw;
 					snapshot->height = th;
-					snapshot->tilt_x = toplevel->tilt_x;
-					snapshot->tilt_y = toplevel->tilt_y;
-					snapshot->z = toplevel->z;
-					snapshot->wobble_x = toplevel->wobble_x;
-					snapshot->wobble_y = toplevel->wobble_y;
+					snapshot->motion.tilt_x = toplevel->motion.tilt_x;
+					snapshot->motion.tilt_y = toplevel->motion.tilt_y;
+					snapshot->physics.z = toplevel->physics.z;
+					snapshot->motion.wobble_x = toplevel->motion.wobble_x;
+					snapshot->motion.wobble_y = toplevel->motion.wobble_y;
 					snapshot->has_alpha = attribs.has_alpha;
 					snapshot->dirty = false;
 				}
@@ -715,9 +715,9 @@ void shady_render_output_frame(
 			th,
 			logical_w,
 			logical_h,
-			toplevel->z,
-			toplevel->tilt_x,
-			toplevel->tilt_y
+			toplevel->physics.z,
+			toplevel->motion.tilt_x,
+			toplevel->motion.tilt_y
 		);
 
 		shady_mat4_multiply(
@@ -727,7 +727,7 @@ void shady_render_output_frame(
 		);
 
 		shady_scene_effects_draw_sides(server, &pipeline, mvp, model,
-			toplevel->wobble_x, toplevel->wobble_y, toplevel->close_progress);
+			toplevel->motion.wobble_x, toplevel->motion.wobble_y, toplevel->close.progress);
 
 		shady_gl_pipeline_draw_window(
 			&pipeline,
@@ -737,9 +737,9 @@ void shady_render_output_frame(
 			mvp,
 			model,
 			time_seconds,
-			toplevel->wobble_x,
-			toplevel->wobble_y,
-			toplevel->close_progress
+			toplevel->motion.wobble_x,
+			toplevel->motion.wobble_y,
+			toplevel->close.progress
 		);
 	}
 
@@ -777,9 +777,9 @@ void shady_render_output_frame(
 			snapshot->height,
 			logical_w,
 			logical_h,
-			snapshot->z,
-			snapshot->tilt_x,
-			snapshot->tilt_y
+			snapshot->physics.z,
+			snapshot->motion.tilt_x,
+			snapshot->motion.tilt_y
 		);
 
 		shady_mat4_multiply(
@@ -789,7 +789,7 @@ void shady_render_output_frame(
 		);
 
 		shady_scene_effects_draw_sides(server, &pipeline, mvp, model,
-			snapshot->wobble_x, snapshot->wobble_y, snapshot->progress);
+			snapshot->motion.wobble_x, snapshot->motion.wobble_y, snapshot->progress);
 
 		shady_gl_pipeline_draw_window(
 			&pipeline,
@@ -876,7 +876,7 @@ void shady_render_toplevel_commit(
 	struct shady_toplevel *toplevel
 ) {
 	if (
-		toplevel->close_state !=
+		toplevel->close.state !=
 		SHADY_CLOSE_ARMED
 	) {
 		return;
@@ -910,7 +910,7 @@ void shady_render_toplevel_unmap(
 	if (
 		!snapshot ||
 		!snapshot->texture ||
-		toplevel->close_state !=
+		toplevel->close.state !=
 			SHADY_CLOSE_ARMED
 	) {
 		return;

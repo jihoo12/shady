@@ -165,44 +165,27 @@ struct shady_toplevel {
 	struct wl_listener request_resize;
 	struct wl_listener request_maximize;
 	struct wl_listener request_fullscreen;
-	float wobble_x;
-	float wobble_y;
+	struct {
+		float wobble_x, wobble_y;
+		float wobble_vx, wobble_vy;
+		float tilt_x, tilt_y;
+		float tilt_vx, tilt_vy;
+		double last_move_x, last_move_y;
+		bool wobble_dragging;
+	} motion;
 
-	float wobble_vx;
-	float wobble_vy;
+	/* Per-window position and velocity owned by the physics module. */
+	struct {
+		float z;
+		float vx, vy, vz;
+	} physics;
 
-	/* Rigid-body 3D tilt, independent from the flexible shader wobble. */
-	float tilt_x;
-	float tilt_y;
-	float tilt_vx;
-	float tilt_vy;
-
-	/* Per-window position on the real world Z axis. 0 = desktop plane. */
-	float z;
-
-	/* World-space linear velocity used by gravity, throwing and floor sliding. */
-	float physics_vx;
-	float physics_vy;
-	float physics_vz;
-
-	double last_move_x;
-	double last_move_y;
-
-	bool wobble_dragging;
-
-		/*
-	 * Animated close state.
-	 *
-	 * Alt+F4 starts the animation instead of immediately sending the
-	 * xdg_toplevel close event.
-	 *
-	 * close_progress:
-	 *     0.0 = normal window
-	 *     1.0 = fully crumpled
-	 */
-	enum shady_close_state close_state;
-	float close_progress;
-	float close_wait_time;
+	/* Animated close lifecycle owned by the close-animation module. */
+	struct {
+		enum shady_close_state state;
+		float progress;
+		float wait_time;
+	} close;
 };
 
 struct shady_popup {

@@ -71,12 +71,12 @@ struct shady_toplevel *shady_toplevel_at_3d(struct shady_server *server,
 
 		float model[16];
 		shady_window_model(model, layout_x, layout_y, tw, th,
-			logical_w, logical_h, toplevel->z, toplevel->tilt_x, toplevel->tilt_y);
+			logical_w, logical_h, toplevel->physics.z, toplevel->motion.tilt_x, toplevel->motion.tilt_y);
 
 		float t, u, v;
 		bool front_hit = false;
-		if (!shady_ray_window_shell_hit(&ray, model, toplevel->wobble_x,
-				toplevel->wobble_y, &t, &u, &v, &front_hit)) {
+		if (!shady_ray_window_shell_hit(&ray, model, toplevel->motion.wobble_x,
+				toplevel->motion.wobble_y, &t, &u, &v, &front_hit)) {
 			continue;
 		}
 		if (t < best_t) {
@@ -146,12 +146,12 @@ struct shady_toplevel *shady_toplevel_at_camera_center(
 		shady_window_model(model,
 			(float)(toplevel->scene_tree->node.x + ox),
 			(float)(toplevel->scene_tree->node.y + oy),
-			tw, th, logical_w, logical_h, toplevel->z,
-			toplevel->tilt_x, toplevel->tilt_y);
+			tw, th, logical_w, logical_h, toplevel->physics.z,
+			toplevel->motion.tilt_x, toplevel->motion.tilt_y);
 		float t, u, v;
 		bool front_hit = false;
-		if (shady_ray_window_shell_hit(&ray, model, toplevel->wobble_x,
-				toplevel->wobble_y, &t, &u, &v, &front_hit) && t < best_t) {
+		if (shady_ray_window_shell_hit(&ray, model, toplevel->motion.wobble_x,
+				toplevel->motion.wobble_y, &t, &u, &v, &front_hit) && t < best_t) {
 			best_t = t;
 			best = toplevel;
 		}

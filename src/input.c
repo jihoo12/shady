@@ -79,16 +79,16 @@ static void process_cursor_move(struct shady_server *server) {
 	 */
 	double dx =
 		new_x -
-		toplevel->last_move_x;
+		toplevel->motion.last_move_x;
 
 	double dy =
 		new_y -
-		toplevel->last_move_y;
+		toplevel->motion.last_move_y;
 
-	if (!toplevel->wobble_dragging) {
-		toplevel->last_move_x = new_x;
-		toplevel->last_move_y = new_y;
-		toplevel->wobble_dragging = true;
+	if (!toplevel->motion.wobble_dragging) {
+		toplevel->motion.last_move_x = new_x;
+		toplevel->motion.last_move_y = new_y;
+		toplevel->motion.wobble_dragging = true;
 
 		dx = 0.0;
 		dy = 0.0;
@@ -101,44 +101,44 @@ static void process_cursor_move(struct shady_server *server) {
 	 * lags behind the mouse.
 	 */
 	if (server->config.window_wobble) {
-		toplevel->wobble_vx -= (float)dx * 0.0065f;
-		toplevel->wobble_vy -= (float)dy * 0.0065f;
+		toplevel->motion.wobble_vx -= (float)dx * 0.0065f;
+		toplevel->motion.wobble_vy -= (float)dy * 0.0065f;
 	}
 
 	/*
 	 * A second, much smaller impulse rotates the whole window as a rigid
 	 * body. Horizontal motion turns around Y; vertical motion turns around X.
 	 */
-	toplevel->tilt_vy += (float)dx * 0.00055f;
-	toplevel->tilt_vx -= (float)dy * 0.00055f;
+	toplevel->motion.tilt_vy += (float)dx * 0.00055f;
+	toplevel->motion.tilt_vx -= (float)dy * 0.00055f;
 
-	if (toplevel->tilt_vx > 0.55f) toplevel->tilt_vx = 0.55f;
-	if (toplevel->tilt_vx < -0.55f) toplevel->tilt_vx = -0.55f;
-	if (toplevel->tilt_vy > 0.55f) toplevel->tilt_vy = 0.55f;
-	if (toplevel->tilt_vy < -0.55f) toplevel->tilt_vy = -0.55f;
+	if (toplevel->motion.tilt_vx > 0.55f) toplevel->motion.tilt_vx = 0.55f;
+	if (toplevel->motion.tilt_vx < -0.55f) toplevel->motion.tilt_vx = -0.55f;
+	if (toplevel->motion.tilt_vy > 0.55f) toplevel->motion.tilt_vy = 0.55f;
+	if (toplevel->motion.tilt_vy < -0.55f) toplevel->motion.tilt_vy = -0.55f;
 
 	/*
 	 * Prevent ridiculous deformation if the pointer jumps a large
 	 * distance in a single event.
 	 */
-	if (toplevel->wobble_vx > 0.45f) {
-		toplevel->wobble_vx = 0.45f;
+	if (toplevel->motion.wobble_vx > 0.45f) {
+		toplevel->motion.wobble_vx = 0.45f;
 	}
 
-	if (toplevel->wobble_vx < -0.45f) {
-		toplevel->wobble_vx = -0.45f;
+	if (toplevel->motion.wobble_vx < -0.45f) {
+		toplevel->motion.wobble_vx = -0.45f;
 	}
 
-	if (toplevel->wobble_vy > 0.45f) {
-		toplevel->wobble_vy = 0.45f;
+	if (toplevel->motion.wobble_vy > 0.45f) {
+		toplevel->motion.wobble_vy = 0.45f;
 	}
 
-	if (toplevel->wobble_vy < -0.45f) {
-		toplevel->wobble_vy = -0.45f;
+	if (toplevel->motion.wobble_vy < -0.45f) {
+		toplevel->motion.wobble_vy = -0.45f;
 	}
 
-	toplevel->last_move_x = new_x;
-	toplevel->last_move_y = new_y;
+	toplevel->motion.last_move_x = new_x;
+	toplevel->motion.last_move_y = new_y;
 
 	wlr_scene_node_set_position(
 		&toplevel->scene_tree->node,
@@ -558,9 +558,9 @@ void server_cursor_axis(struct wl_listener *listener, void *data) {
 		struct shady_toplevel *toplevel = focused_toplevel(server);
 		if (toplevel) {
 			float direction = event->delta < 0.0 ? 1.0f : -1.0f;
-			toplevel->z += direction * WINDOW_Z_STEP;
-			if (toplevel->z < WINDOW_Z_MIN) toplevel->z = WINDOW_Z_MIN;
-			if (toplevel->z > WINDOW_Z_MAX) toplevel->z = WINDOW_Z_MAX;
+			toplevel->physics.z += direction * WINDOW_Z_STEP;
+			if (toplevel->physics.z < WINDOW_Z_MIN) toplevel->physics.z = WINDOW_Z_MIN;
+			if (toplevel->physics.z > WINDOW_Z_MAX) toplevel->physics.z = WINDOW_Z_MAX;
 			shady_render_schedule_all_outputs(server);
 		}
 		return;

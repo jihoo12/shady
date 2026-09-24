@@ -61,13 +61,13 @@ static void begin_interactive(struct shady_toplevel *toplevel,
 		/*
 		* Initialise the wobble drag tracker.
 		*/
-		toplevel->last_move_x =
+		toplevel->motion.last_move_x =
 			toplevel->scene_tree->node.x;
 
-		toplevel->last_move_y =
+		toplevel->motion.last_move_y =
 			toplevel->scene_tree->node.y;
 
-		toplevel->wobble_dragging = true;
+		toplevel->motion.wobble_dragging = true;
 	} else {
 		struct wlr_box *geo_box = &toplevel->xdg_toplevel->base->geometry;
 

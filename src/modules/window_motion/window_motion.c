@@ -9,29 +9,29 @@ void shady_window_motion_update_toplevel(struct shady_server *server,
 	 * all accumulated state so other modules cannot leave a latent impulse. */
 	if (server->config.window_wobble) {
 		const float spring = 42.f, damping_rate = 7.5f;
-		toplevel->wobble_vx += -toplevel->wobble_x * spring * dt;
-		toplevel->wobble_vy += -toplevel->wobble_y * spring * dt;
+		toplevel->motion.wobble_vx += -toplevel->motion.wobble_x * spring * dt;
+		toplevel->motion.wobble_vy += -toplevel->motion.wobble_y * spring * dt;
 		float damping = 1.f - damping_rate * dt;
 		if (damping < 0.f) damping = 0.f;
-		toplevel->wobble_vx *= damping;
-		toplevel->wobble_vy *= damping;
-		toplevel->wobble_x += toplevel->wobble_vx * dt;
-		toplevel->wobble_y += toplevel->wobble_vy * dt;
-		if (fabsf(toplevel->wobble_x)<.00005f && fabsf(toplevel->wobble_vx)<.00005f)
-			toplevel->wobble_x=toplevel->wobble_vx=0.f;
-		if (fabsf(toplevel->wobble_y)<.00005f && fabsf(toplevel->wobble_vy)<.00005f)
-			toplevel->wobble_y=toplevel->wobble_vy=0.f;
+		toplevel->motion.wobble_vx *= damping;
+		toplevel->motion.wobble_vy *= damping;
+		toplevel->motion.wobble_x += toplevel->motion.wobble_vx * dt;
+		toplevel->motion.wobble_y += toplevel->motion.wobble_vy * dt;
+		if (fabsf(toplevel->motion.wobble_x)<.00005f && fabsf(toplevel->motion.wobble_vx)<.00005f)
+			toplevel->motion.wobble_x=toplevel->motion.wobble_vx=0.f;
+		if (fabsf(toplevel->motion.wobble_y)<.00005f && fabsf(toplevel->motion.wobble_vy)<.00005f)
+			toplevel->motion.wobble_y=toplevel->motion.wobble_vy=0.f;
 	} else {
-		toplevel->wobble_x=toplevel->wobble_y=0.f;
-		toplevel->wobble_vx=toplevel->wobble_vy=0.f;
+		toplevel->motion.wobble_x=toplevel->motion.wobble_y=0.f;
+		toplevel->motion.wobble_vx=toplevel->motion.wobble_vy=0.f;
 	}
 
 	/* Rigid tilt is intentionally independent from flexible wobble. */
 	const float tilt_damping_rate = 9.f;
 	float damping = 1.f - tilt_damping_rate * dt;
 	if (damping < 0.f) damping = 0.f;
-	toplevel->tilt_vx *= damping;
-	toplevel->tilt_vy *= damping;
-	toplevel->tilt_x += toplevel->tilt_vx * dt;
-	toplevel->tilt_y += toplevel->tilt_vy * dt;
+	toplevel->motion.tilt_vx *= damping;
+	toplevel->motion.tilt_vy *= damping;
+	toplevel->motion.tilt_x += toplevel->motion.tilt_vx * dt;
+	toplevel->motion.tilt_y += toplevel->motion.tilt_vy * dt;
 }
