@@ -1,6 +1,6 @@
 # shady
 
-![Shady 3D desktop](screenshots/Screenshot2.png)
+![Shady 3D desktop](screenshots/Screenshot3.png)
 
 A small experimental **3D Wayland compositor** based on the TinyWL example from
 wlroots 0.20.2.
