@@ -20,7 +20,7 @@ void shady_physics_toggle_gravity(struct shady_server *server) {
 	shady_render_schedule_all_outputs(server);
 }
 void shady_physics_update(struct shady_server *server,float dt,float logical_w,float logical_h) {
-	if(!server->config.physics_enabled || !server->physics.gravity_enabled || dt<=0.f || logical_w<=0.f || logical_h<=0.f) return;
+	if(!server->config.physics_enabled || !server->physics.gravity_enabled || !server->camera.first_person || dt<=0.f || logical_w<=0.f || logical_h<=0.f) return;
 	const float restitution=.22f, friction_rate=7.f, angular_kick=.22f;
 	struct shady_toplevel *t;
 	wl_list_for_each(t,&server->toplevels,link) {
