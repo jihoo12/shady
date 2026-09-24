@@ -27,6 +27,7 @@
 #include "../modules/fps/fps.h"
 #include "../modules/window_motion/window_motion.h"
 #include "../modules/close_animation/close_animation.h"
+#include "../modules/scene_effects/scene_effects.h"
 
 static struct shady_gl_pipeline pipeline;
 static bool pipeline_ready;
@@ -519,9 +520,7 @@ void shady_render_output_frame(
 	 * the depth buffer and camera VP matrix, orbiting immediately reveals
 	 * perspective and per-window Z separation.
 	 */
-	if (server->config.floor) {
-		shady_gl_pipeline_draw_floor(&pipeline, vp);
-	}
+	shady_scene_effects_draw_floor(server, &pipeline, vp);
 
 	double ox = 0;
 	double oy = 0;
@@ -581,27 +580,8 @@ void shady_render_output_frame(
 	 * mesh and directional light as the window lighting.
 	 */
 	struct shady_toplevel *toplevel;
-	if (server->config.shadows) {
-	wl_list_for_each_reverse(toplevel, &server->toplevels, link) {
-		struct wlr_surface *surface = toplevel->xdg_toplevel->base->surface;
-		if (!surface->mapped || toplevel->close_progress >= 0.02f) {
-			continue;
-		}
-		float tw = (float)surface->current.width;
-		float th = (float)surface->current.height;
-		if (tw <= 0.f || th <= 0.f) {
-			continue;
-		}
-		float layout_x = (float)(toplevel->scene_tree->node.x + ox);
-		float layout_y = (float)(toplevel->scene_tree->node.y + oy);
-		float shadow_model[16];
-		shady_window_model(shadow_model, layout_x, layout_y, tw, th,
-			logical_w, logical_h, toplevel->z, toplevel->tilt_x, toplevel->tilt_y);
-		shady_gl_pipeline_draw_shadow(&pipeline, vp, shadow_model,
-			toplevel->wobble_x, toplevel->wobble_y, toplevel->z);
-	}
-	}
-
+	shady_scene_effects_draw_shadows(server, &pipeline, vp,
+		logical_w, logical_h, ox, oy);
 
 
 	wl_list_for_each_reverse(
@@ -746,9 +726,8 @@ void shady_render_output_frame(
 			model
 		);
 
-		if (server->config.window_sides && toplevel->close_progress < 0.02f) {
-			shady_gl_pipeline_draw_sides(&pipeline, mvp, model, toplevel->wobble_x, toplevel->wobble_y);
-		}
+		shady_scene_effects_draw_sides(server, &pipeline, mvp, model,
+			toplevel->wobble_x, toplevel->wobble_y, toplevel->close_progress);
 
 		shady_gl_pipeline_draw_window(
 			&pipeline,
@@ -809,9 +788,8 @@ void shady_render_output_frame(
 			model
 		);
 
-		if (server->config.window_sides && snapshot->progress < 0.02f) {
-			shady_gl_pipeline_draw_sides(&pipeline, mvp, model, snapshot->wobble_x, snapshot->wobble_y);
-		}
+		shady_scene_effects_draw_sides(server, &pipeline, mvp, model,
+			snapshot->wobble_x, snapshot->wobble_y, snapshot->progress);
 
 		shady_gl_pipeline_draw_window(
 			&pipeline,

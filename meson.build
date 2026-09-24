@@ -24,6 +24,7 @@ physics_enabled = get_option('physics').enabled()
 fps_enabled = get_option('fps').enabled()
 window_motion_enabled = get_option('window_motion').enabled()
 close_animation_enabled = get_option('close_animation').enabled()
+scene_effects_enabled = get_option('scene_effects').enabled()
 if physics_enabled
   shady_sources += 'src/modules/physics/physics.c'
 endif
@@ -36,6 +37,9 @@ endif
 if close_animation_enabled
   shady_sources += 'src/modules/close_animation/close_animation.c'
 endif
+if scene_effects_enabled
+  shady_sources += 'src/modules/scene_effects/scene_effects.c'
+endif
 
 executable('shady',
   shady_sources,
@@ -47,6 +51,7 @@ executable('shady',
     '-DSHADY_HAS_FPS=@0@'.format(fps_enabled ? 1 : 0),
     '-DSHADY_HAS_WINDOW_MOTION=@0@'.format(window_motion_enabled ? 1 : 0),
     '-DSHADY_HAS_CLOSE_ANIMATION=@0@'.format(close_animation_enabled ? 1 : 0),
+    '-DSHADY_HAS_SCENE_EFFECTS=@0@'.format(scene_effects_enabled ? 1 : 0),
   ],
   include_directories: include_directories('src'),
   dependencies: [
