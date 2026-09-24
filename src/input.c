@@ -100,11 +100,10 @@ static void process_cursor_move(struct shady_server *server) {
 	 * This creates the feeling that the window's body has mass and
 	 * lags behind the mouse.
 	 */
-	toplevel->wobble_vx -=
-		(float)dx * 0.0065f;
-
-	toplevel->wobble_vy -=
-		(float)dy * 0.0065f;
+	if (server->config.window_wobble) {
+		toplevel->wobble_vx -= (float)dx * 0.0065f;
+		toplevel->wobble_vy -= (float)dy * 0.0065f;
+	}
 
 	/*
 	 * A second, much smaller impulse rotates the whole window as a rigid
@@ -302,6 +301,10 @@ static void begin_close_animation(
 	if (!toplevel) {
 		return;
 	}
+	if (!server->config.close_animation) {
+		wlr_xdg_toplevel_send_close(toplevel->xdg_toplevel);
+		return;
+	}
 
 	if (
 		toplevel->close_state != SHADY_CLOSE_IDLE &&
@@ -368,6 +371,7 @@ static bool handle_keybinding(struct shady_server *server, xkb_keysym_t sym) {
 	}
 
 	if (sym == XKB_KEY_F2) {
+		if (!server->config.fps_mode) return true;
 		server->camera.first_person = !server->camera.first_person;
 		server->fps_forward = server->fps_back = false;
 		server->fps_left = server->fps_right = false;

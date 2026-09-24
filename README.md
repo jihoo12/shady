@@ -158,3 +158,28 @@ navigation, throwing, optional gravity, floor collisions, bounce, friction, and
 projected shadows. Rendering accuracy, richer rigid-body collisions,
 multi-output behavior, and interaction polish remain active areas of
 development.
+
+
+## Configuration
+
+Shady loads a simple configuration file from `$XDG_CONFIG_HOME/shady/config`,
+or `~/.config/shady/config` when `XDG_CONFIG_HOME` is unset. A different file
+can be selected with `shady -c /path/to/config`.
+
+Example:
+
+```ini
+# ~/.config/shady/config
+window_gravity = false
+window_wobble = true
+window_sides = true
+shadows = true
+floor = true
+close_animation = true
+fps_mode = true
+```
+
+Boolean values accept `true/false`, `yes/no`, `on/off`, or `1/0`.
+Unknown keys and invalid values are reported in the log and ignored. Missing
+configuration files are fine; built-in defaults are used. Settings are loaded
+at startup, so restart Shady after editing the file.

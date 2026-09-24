@@ -51,6 +51,16 @@ enum shady_close_state {
 
 struct shady_toplevel;
 
+struct shady_config {
+	bool window_gravity;
+	bool window_wobble;
+	bool window_sides;
+	bool shadows;
+	bool floor;
+	bool close_animation;
+	bool fps_mode;
+};
+
 struct shady_server {
 	struct wl_display *wl_display;
 	struct wlr_backend *backend;
@@ -89,6 +99,7 @@ struct shady_server {
 	struct wl_listener new_output;
 
 	struct shady_camera camera;
+	struct shady_config config;
 	double cam_grab_x, cam_grab_y;
 	float cam_grab_yaw, cam_grab_pitch;
 	float cam_grab_target_x, cam_grab_target_y, cam_grab_target_z;
@@ -185,6 +196,10 @@ struct shady_keyboard {
 	struct wl_listener key;
 	struct wl_listener destroy;
 };
+
+/* config.c */
+void shady_config_defaults(struct shady_config *config);
+bool shady_config_load(struct shady_config *config, const char *path);
 
 /* Shared helpers used across compositor modules */
 void focus_toplevel(struct shady_toplevel *toplevel);

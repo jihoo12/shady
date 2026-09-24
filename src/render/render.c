@@ -932,7 +932,9 @@ void shady_render_output_frame(
 	 * the depth buffer and camera VP matrix, orbiting immediately reveals
 	 * perspective and per-window Z separation.
 	 */
-	shady_gl_pipeline_draw_floor(&pipeline, vp);
+	if (server->config.floor) {
+		shady_gl_pipeline_draw_floor(&pipeline, vp);
+	}
 
 	double ox = 0;
 	double oy = 0;
@@ -992,6 +994,7 @@ void shady_render_output_frame(
 	 * mesh and directional light as the window lighting.
 	 */
 	struct shady_toplevel *toplevel;
+	if (server->config.shadows) {
 	wl_list_for_each_reverse(toplevel, &server->toplevels, link) {
 		struct wlr_surface *surface = toplevel->xdg_toplevel->base->surface;
 		if (!surface->mapped || toplevel->close_progress >= 0.02f) {
@@ -1009,6 +1012,7 @@ void shady_render_output_frame(
 			logical_w, logical_h, toplevel->z, toplevel->tilt_x, toplevel->tilt_y);
 		shady_gl_pipeline_draw_shadow(&pipeline, vp, shadow_model,
 			toplevel->wobble_x, toplevel->wobble_y, toplevel->z);
+	}
 	}
 
 
@@ -1155,7 +1159,7 @@ void shady_render_output_frame(
 			model
 		);
 
-		if (toplevel->close_progress < 0.02f) {
+		if (server->config.window_sides && toplevel->close_progress < 0.02f) {
 			shady_gl_pipeline_draw_sides(&pipeline, mvp, model, toplevel->wobble_x, toplevel->wobble_y);
 		}
 
@@ -1218,7 +1222,7 @@ void shady_render_output_frame(
 			model
 		);
 
-		if (snapshot->progress < 0.02f) {
+		if (server->config.window_sides && snapshot->progress < 0.02f) {
 			shady_gl_pipeline_draw_sides(&pipeline, mvp, model, snapshot->wobble_x, snapshot->wobble_y);
 		}
 

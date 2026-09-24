@@ -23,6 +23,14 @@
 #include "shady.h"
 #include "render/render.h"
 
+static void default_config_path(char *buf, size_t size) {
+	const char *xdg = getenv("XDG_CONFIG_HOME");
+	const char *home = getenv("HOME");
+	if (xdg && *xdg) snprintf(buf, size, "%s/shady/config", xdg);
+	else if (home && *home) snprintf(buf, size, "%s/.config/shady/config", home);
+	else snprintf(buf, size, "shady.conf");
+}
+
 static int terminate_display(int signal_number, void *data) {
 	(void)signal_number;
 	wl_display_terminate(data);
@@ -32,24 +40,36 @@ static int terminate_display(int signal_number, void *data) {
 int main(int argc, char *argv[]) {
 	wlr_log_init(WLR_DEBUG, NULL);
 	char *startup_cmd = NULL;
+	char *config_path = NULL;
 
 	int c;
-	while ((c = getopt(argc, argv, "s:h")) != -1) {
+	while ((c = getopt(argc, argv, "s:c:h")) != -1) {
 		switch (c) {
 		case 's':
 			startup_cmd = optarg;
 			break;
+		case 'c':
+			config_path = optarg;
+			break;
 		default:
-			printf("Usage: %s [-s startup command]\n", argv[0]);
+			printf("Usage: %s [-s startup command] [-c config path]\n", argv[0]);
 			return 0;
 		}
 	}
 	if (optind < argc) {
-		printf("Usage: %s [-s startup command]\n", argv[0]);
+		printf("Usage: %s [-s startup command] [-c config path]\n", argv[0]);
 		return 0;
 	}
 
 	struct shady_server server = {0};
+	shady_config_defaults(&server.config);
+	char config_buf[4096];
+	if (!config_path) {
+		default_config_path(config_buf, sizeof(config_buf));
+		config_path = config_buf;
+	}
+	shady_config_load(&server.config, config_path);
+	server.window_gravity = server.config.window_gravity;
 	server.wl_display = wl_display_create();
 	if (!server.wl_display) {
 		return 1;

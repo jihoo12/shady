@@ -10,6 +10,7 @@ shader_dir = join_paths(meson.project_source_root(), 'shaders')
 
 executable('shady',
   'src/main.c',
+  'src/config.c',
   'src/input.c',
   'src/xdg.c',
   'src/output.c',
