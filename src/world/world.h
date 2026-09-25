@@ -12,10 +12,11 @@ struct shady_world {
 	size_t collider_count;
 };
 
-static inline void shady_world_add_collider(struct shady_world *world,
+static inline bool shady_world_add_collider(struct shady_world *world,
 		struct shady_box_collider collider) {
-	if (world->collider_count < SHADY_WORLD_MAX_COLLIDERS)
-		world->colliders[world->collider_count++] = collider;
+	if (world->collider_count >= SHADY_WORLD_MAX_COLLIDERS) return false;
+	world->colliders[world->collider_count++] = collider;
+	return true;
 }
 
 /* Build the current static world. OBJ/environment objects can register their

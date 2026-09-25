@@ -50,6 +50,23 @@ static bool load_ppm(const char*path){FILE*f=fopen(path,"rb");if(!f){wlr_log(WLR
  * corrupts PPMs whose row size is not divisible by four (e.g. 330px wide). */
 glPixelStorei(GL_UNPACK_ALIGNMENT,1);glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,w,h,0,GL_RGB,GL_UNSIGNED_BYTE,p);free(p);snprintf(loaded_path,sizeof(loaded_path),"%s",path);wlr_log(WLR_INFO,"sky: loaded %s (%dx%d)",path,w,h);return true;}
 bool shady_environment_init(struct shady_gl_pipeline*p){(void)p;return make_program()&&make_mesh_program();}
+bool shady_environment_load_world(struct shady_server*s){
+	if(!s->config.environment_obj||!s->config.environment_obj_path[0])return true;
+	struct shady_mesh mesh;
+	if(!shady_obj_load(s->config.environment_obj_path,&mesh))return false;
+	struct shady_box_collider box={
+		mesh.bounds_min[0],mesh.bounds_max[0],
+		mesh.bounds_min[1],mesh.bounds_max[1],
+		mesh.bounds_min[2],mesh.bounds_max[2]
+	};
+	bool added=shady_world_add_collider(&s->world,box);
+	if(added)wlr_log(WLR_INFO,
+		"environment: registered OBJ bounds collider %.3f %.3f %.3f -> %.3f %.3f %.3f",
+		box.min_x,box.min_y,box.min_z,box.max_x,box.max_y,box.max_z);
+	else wlr_log(WLR_ERROR,"environment: world collider capacity reached");
+	shady_mesh_fini(&mesh);
+	return added;
+}
 void shady_environment_fini(void){if(mesh_vbo)glDeleteBuffers(1,&mesh_vbo);if(mesh_prog)glDeleteProgram(mesh_prog);if(tex)glDeleteTextures(1,&tex);if(vbo)glDeleteBuffers(1,&vbo);if(prog)glDeleteProgram(prog);mesh_vbo=mesh_prog=tex=vbo=prog=0;mesh_vertex_count=0;loaded_obj_path[0]=0;loaded_path[0]=0;}
 void shady_environment_draw(struct shady_server*s,struct shady_gl_pipeline*p,const float view[16],const float proj[16]){(void)p;(void)view;(void)proj;if(!s->config.sky||!s->config.sky_path[0])return;if(!tex||strcmp(loaded_path,s->config.sky_path))if(!load_ppm(s->config.sky_path))return;GLint vp[4];glGetIntegerv(GL_VIEWPORT,vp);glDisable(GL_DEPTH_TEST);glDepthMask(GL_FALSE);glUseProgram(prog);glUniform1i(u_tex,0);struct shady_vec3 r,u,f;shady_camera_basis(&s->camera,&r,&u,&f);glUniform3f(u_right,r.x,r.y,r.z);glUniform3f(u_up,u.x,u.y,u.z);glUniform3f(u_forward,f.x,f.y,f.z);glUniform1f(u_aspect,vp[3]?((float)vp[2]/vp[3]):1.f);glActiveTexture(GL_TEXTURE0);glBindTexture(GL_TEXTURE_2D,tex);glBindBuffer(GL_ARRAY_BUFFER,vbo);glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,0,0);glEnableVertexAttribArray(0);glDrawArrays(GL_TRIANGLES,0,6);glDisableVertexAttribArray(0);glBindBuffer(GL_ARRAY_BUFFER,0);glUseProgram(0);glDepthMask(GL_TRUE);glEnable(GL_DEPTH_TEST);}
 
