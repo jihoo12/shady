@@ -12,6 +12,22 @@
 #include "../../world/world.h"
 #define WINDOW_GRAVITY 2.8f
 
+bool shady_physics_window_body(const struct shady_toplevel *t,float logical_w,float logical_h,struct shady_window_body *body){
+	if(!t||!body||logical_h<=0.f)return false;
+	struct wlr_surface*s=t->xdg_toplevel->base->surface;
+	float tw=(float)s->current.width,th=(float)s->current.height;if(tw<=0.f||th<=0.f)return false;
+	float ww=tw/logical_h,wh=th/logical_h,tx=0.f,ty=0.f;shady_window_motion_get_tilt(t,&tx,&ty);
+	float sx=sinf(tx),cx=cosf(tx),sy=sinf(ty);
+	body->center[0]=((float)t->scene_tree->node.x+tw*.5f-logical_w*.5f)/logical_h;
+	body->center[1]=.5f-((float)t->scene_tree->node.y+th*.5f)/logical_h;
+	body->center[2]=t->transform.z;body->tilt_x=tx;body->tilt_y=ty;
+	body->half[0]=fabsf(cosf(ty))*ww*.5f;
+	body->half[1]=fabsf(cx)*wh*.5f+fabsf(sx*sy)*ww*.5f;
+	body->half[2]=fabsf(sy)*ww*.5f+fabsf(sx)*wh*.5f;
+	if(body->half[0]<.006f)body->half[0]=.006f;if(body->half[1]<.012f)body->half[1]=.012f;if(body->half[2]<.006f)body->half[2]=.006f;
+	return true;
+}
+
 void shady_physics_init(struct shady_server *server) {
 	server->physics.gravity_enabled=server->config.physics_enabled && server->config.window_gravity;
 }

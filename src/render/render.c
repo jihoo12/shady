@@ -827,6 +827,18 @@ void shady_render_output_frame(
 		for (size_t i=0;i<server->world.collider_count;i++)
 			shady_gl_pipeline_draw_debug_box(&pipeline,vp,
 				&server->world.colliders[i],i>=2);
+		struct shady_toplevel *debug_t;
+		wl_list_for_each(debug_t,&server->toplevels,link){
+			struct wlr_surface *ds=debug_t->xdg_toplevel->base->surface;
+			if(!ds->mapped)continue;
+			float dw=(float)ds->current.width,dh=(float)ds->current.height;
+			if(dw<=0.f||dh<=0.f)continue;
+			float dm[16];
+			shady_window_model(dm,(float)debug_t->scene_tree->node.x+ox,
+				(float)debug_t->scene_tree->node.y+oy,dw,dh,logical_w,logical_h,
+				debug_t->transform.z,debug_t->motion.tilt_x,debug_t->motion.tilt_y);
+			shady_gl_pipeline_draw_debug_window_body(&pipeline,vp,dm);
+		}
 	}
 
 	if (server->debug_ray && server->camera.first_person) {

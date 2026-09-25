@@ -1297,6 +1297,17 @@ void shady_gl_pipeline_draw_debug_ray(
 	glUseProgram(0);
 }
 
+void shady_gl_pipeline_draw_debug_window_body(
+		struct shady_gl_pipeline *pipeline,const float vp[16],const float model[16]){
+	static const GLfloat q[]={0,0,0,1,0,0, 1,0,0,1,1,0, 1,1,0,0,1,0, 0,1,0,0,0,0};
+	float mvp[16];shady_mat4_multiply(mvp,vp,model);
+	glUseProgram(pipeline->debug_prog);glUniformMatrix4fv(pipeline->debug_u_vp,1,GL_FALSE,mvp);
+	glUniform4f(pipeline->debug_u_color,1.f,.15f,.85f,1.f);glDisable(GL_BLEND);glDepthMask(GL_FALSE);
+	glBindBuffer(GL_ARRAY_BUFFER,0);glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,q);
+	glEnableVertexAttribArray(0);glDrawArrays(GL_LINES,0,8);glDisableVertexAttribArray(0);
+	glDepthMask(GL_TRUE);glUseProgram(0);
+}
+
 void shady_gl_pipeline_draw_debug_box(
 		struct shady_gl_pipeline *pipeline, const float vp[16],
 		const struct shady_box_collider *b, bool environment) {

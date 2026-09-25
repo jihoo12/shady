@@ -136,6 +136,9 @@ void shady_gl_pipeline_draw_debug_ray(
 	struct shady_gl_pipeline *pipeline,
 	const float vp[16], const float origin[3], const float end[3], bool hit
 );
+void shady_gl_pipeline_draw_debug_window_body(
+	struct shady_gl_pipeline *pipeline, const float vp[16], const float model[16]
+);
 void shady_gl_pipeline_draw_debug_box(
 	struct shady_gl_pipeline *pipeline, const float vp[16],
 	const struct shady_box_collider *box, bool environment
