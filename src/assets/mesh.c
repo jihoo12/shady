@@ -2,6 +2,7 @@
 
 #include <float.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 void shady_mesh_init(struct shady_mesh *mesh) {
 	*mesh = (struct shady_mesh){0};
