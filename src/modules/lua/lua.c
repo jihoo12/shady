@@ -13,6 +13,7 @@
 #include <wlr/types/wlr_xdg_shell.h>
 
 static struct shady_server *lua_server;
+static void push_window(lua_State *L,struct shady_toplevel *t);
 #define SHADY_LUA_MAX_BINDS 32
 struct lua_bind { xkb_keysym_t sym; uint32_t modifiers; int ref; };
 static struct lua_bind lua_binds[SHADY_LUA_MAX_BINDS]; static size_t lua_bind_count;
@@ -46,6 +47,13 @@ static int l_shady_camera(lua_State *L){
 }
 static int l_shady_quit(lua_State *L){(void)L;if(lua_server->wl_display)wl_display_terminate(lua_server->wl_display);return 0;}
 static int l_shady_toggle_gravity(lua_State *L){(void)L;shady_physics_toggle_gravity(lua_server);return 0;}
+static int l_shady_windows(lua_State *L){
+	lua_newtable(L);int n=1;struct shady_toplevel*t;
+	wl_list_for_each(t,&lua_server->toplevels,link){push_window(L,t);lua_rawseti(L,-2,n++);}return 1;
+}
+static int l_shady_expand_all(lua_State *L){(void)L;struct shady_toplevel*t;wl_list_for_each(t,&lua_server->toplevels,link){t->fps_expanded=true;shady_physics_stop(t);}lua_server->fps.expanded_toplevel=NULL;lua_server->fps.input_capture=false;shady_render_schedule_all_outputs(lua_server);return 0;}
+static int l_shady_fold_all(lua_State *L){(void)L;struct shady_toplevel*t;wl_list_for_each(t,&lua_server->toplevels,link)t->fps_expanded=false;lua_server->fps.expanded_toplevel=NULL;lua_server->fps.input_capture=lua_server->camera.first_person;shady_render_schedule_all_outputs(lua_server);return 0;}
+static int l_shady_respawn_all(lua_State *L){(void)L;shady_physics_respawn_all(lua_server);return 0;}
 static int l_shady_toggle_fps(lua_State *L){(void)L;shady_fps_toggle(lua_server);return 0;}
 
 static int l_shady_config(lua_State *L){
@@ -71,6 +79,10 @@ static void install_api(lua_State *L){
 	lua_pushcfunction(L,l_shady_toggle_gravity);lua_setfield(L,-2,"toggle_gravity");
 	lua_pushcfunction(L,l_shady_toggle_fps);lua_setfield(L,-2,"toggle_fps");
 	lua_pushcfunction(L,l_shady_quit);lua_setfield(L,-2,"quit");
+	lua_pushcfunction(L,l_shady_windows);lua_setfield(L,-2,"windows");
+	lua_pushcfunction(L,l_shady_expand_all);lua_setfield(L,-2,"expand_all");
+	lua_pushcfunction(L,l_shady_fold_all);lua_setfield(L,-2,"fold_all");
+	lua_pushcfunction(L,l_shady_respawn_all);lua_setfield(L,-2,"respawn_all");
 	lua_setglobal(L,"shady");
 }
 static void default_script_path(char *buf,size_t size){
