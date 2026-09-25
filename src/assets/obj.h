@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "mesh.h"
 #include "../world/collider.h"
+#include "../world/world.h"
 
 /* Load a Wavefront OBJ into Shady's CPU-side triangle mesh.
  * Supported faces: v, v/vt, v//vn, v/vt/vn. Polygons are triangulated as a
