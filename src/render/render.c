@@ -718,7 +718,7 @@ void shady_render_output_frame(
 		if(server->camera.first_person&&!toplevel->fps_expanded){
 			float cx=(layout_x+tw*.5f-logical_w*.5f)/logical_h;
 			float cy=.5f-(layout_y+th*.5f)/logical_h;
-			shady_window_cube_model(model,cx,cy,toplevel->transform.z,.16f,
+			shady_window_cube_model(model,cx,cy,toplevel->transform.z,SHADY_FPS_CUBE_SIZE,
 				toplevel->motion.tilt_x,toplevel->motion.tilt_y);
 		}else{
 			shady_window_model(
@@ -844,7 +844,7 @@ void shady_render_output_frame(
 			if(server->camera.first_person&&!debug_t->fps_expanded){
 				float dx=(float)debug_t->scene_tree->node.x+ox,dy=(float)debug_t->scene_tree->node.y+oy;
 				float dcx=(dx+dw*.5f-logical_w*.5f)/logical_h,dcy=.5f-(dy+dh*.5f)/logical_h;
-				shady_window_cube_model(dm,dcx,dcy,debug_t->transform.z,.16f,debug_t->motion.tilt_x,debug_t->motion.tilt_y);
+				shady_window_cube_model(dm,dcx,dcy,debug_t->transform.z,SHADY_FPS_CUBE_SIZE,debug_t->motion.tilt_x,debug_t->motion.tilt_y);
 			}else shady_window_model(dm,(float)debug_t->scene_tree->node.x+ox,(float)debug_t->scene_tree->node.y+oy,dw,dh,logical_w,logical_h,debug_t->transform.z,debug_t->motion.tilt_x,debug_t->motion.tilt_y);
 			shady_gl_pipeline_draw_debug_window_body(&pipeline,vp,dm);
 		}
