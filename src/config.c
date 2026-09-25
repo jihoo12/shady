@@ -81,6 +81,29 @@ static bool parse_keybind(const char *s, struct shady_keybind *out) {
 	return true;
 }
 
+bool shady_config_set(struct shady_config *c,const char *key,const char *value){
+	if(!strcmp(key,"sky_path")){snprintf(c->sky_path,sizeof(c->sky_path),"%s",value);return true;}
+	if(!strcmp(key,"environment_obj_path")){snprintf(c->environment_obj_path,sizeof(c->environment_obj_path),"%s",value);return true;}
+#define BIND_SET(name,field) if(!strcmp(key,"bind." name))return parse_keybind(value,&c->field);
+	BIND_SET("quit",bind_quit) BIND_SET("cycle_windows",bind_cycle_windows)
+	BIND_SET("close_window",bind_close_window) BIND_SET("fps_toggle",bind_fps_toggle)
+	BIND_SET("fps_capture",bind_fps_capture) BIND_SET("gravity_toggle",bind_gravity_toggle)
+	BIND_SET("debug_ray",bind_debug_ray) BIND_SET("camera_left",bind_camera_left)
+	BIND_SET("camera_right",bind_camera_right) BIND_SET("camera_up",bind_camera_up)
+	BIND_SET("camera_down",bind_camera_down) BIND_SET("camera_yaw_left",bind_camera_yaw_left)
+	BIND_SET("camera_yaw_right",bind_camera_yaw_right) BIND_SET("camera_zoom_in",bind_camera_zoom_in)
+	BIND_SET("camera_zoom_out",bind_camera_zoom_out) BIND_SET("camera_reset",bind_camera_reset)
+#undef BIND_SET
+	bool v;if(!parse_bool(value,&v))return false;
+#define BOOL_SET(name,field) if(!strcmp(key,name)){c->field=v;return true;}
+	BOOL_SET("physics_enabled",physics_enabled) BOOL_SET("window_gravity",window_gravity)
+	BOOL_SET("window_wobble",window_wobble) BOOL_SET("window_sides",window_sides)
+	BOOL_SET("shadows",shadows) BOOL_SET("floor",floor) BOOL_SET("close_animation",close_animation)
+	BOOL_SET("fps_mode",fps_mode) BOOL_SET("sky",sky) BOOL_SET("environment_obj",environment_obj)
+#undef BOOL_SET
+	return false;
+}
+
 bool shady_config_load(struct shady_config *c, const char *path) {
 	FILE *fp = fopen(path, "r");
 	if (!fp) {
