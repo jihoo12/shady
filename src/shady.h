@@ -14,6 +14,7 @@
 #include "modules/physics/state.h"
 #include "modules/window_motion/state.h"
 #include "modules/close_animation/state.h"
+#include "modules/lua/state.h"
 
 struct wlr_allocator;
 struct wlr_backend;
@@ -122,6 +123,7 @@ struct shady_server {
 	/* Runtime state owned by optional modules. */
 	struct shady_fps_state fps;
 	struct shady_physics_state physics;
+	struct shady_lua_state lua;
 	bool debug_ray;
 };
 
