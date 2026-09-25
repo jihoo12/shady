@@ -86,17 +86,28 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 		float previous_bottom=center_y-half_h;
 		t->physics.vy-=WINDOW_GRAVITY*dt;
 
-		/* Axis-separated swept AABB: -X/+X, -Y/+Y and -Z/+Z all use the
-		 * same collision path. This also chooses the nearest crossed face
-		 * instead of whichever collider happens to appear first. */
+		/* Substep fast diagonal throws. A single axis-separated sweep can miss
+		 * an edge when another coordinate enters a collider during the same
+		 * frame (for example wall + floor). Keep each substep below a quarter
+		 * cube so every face gets a chance to become the active contact. */
 		float center[3]={center_x,center_y,t->transform.z};
 		const float half[3]={half_x,half_h,half_z};
-		bool hit_y=sweep_cube_axis(&server->world,center,half,1,t->physics.vy*dt,
-			&t->physics.vy,restitution);
-		bool hit_x=sweep_cube_axis(&server->world,center,half,0,t->physics.vx*dt,
-			&t->physics.vx,restitution);
-		bool hit_z=sweep_cube_axis(&server->world,center,half,2,t->physics.vz*dt,
-			&t->physics.vz,restitution);
+		float max_move=fmaxf(fabsf(t->physics.vx*dt),
+			fmaxf(fabsf(t->physics.vy*dt),fabsf(t->physics.vz*dt)));
+		float max_step=cube_size*.25f;
+		int steps=(int)ceilf(max_move/max_step);
+		if(steps<1)steps=1;
+		if(steps>16)steps=16;
+		float step_dt=dt/(float)steps;
+		bool hit_x=false,hit_y=false,hit_z=false;
+		for(int step=0;step<steps;step++){
+			hit_y|=sweep_cube_axis(&server->world,center,half,1,
+				t->physics.vy*step_dt,&t->physics.vy,restitution);
+			hit_x|=sweep_cube_axis(&server->world,center,half,0,
+				t->physics.vx*step_dt,&t->physics.vx,restitution);
+			hit_z|=sweep_cube_axis(&server->world,center,half,2,
+				t->physics.vz*step_dt,&t->physics.vz,restitution);
+		}
 		center_x=center[0];center_y=center[1];t->transform.z=center[2];
 
 		if(hit_x)shady_window_motion_add_impulse(server,t,
