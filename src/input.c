@@ -23,6 +23,7 @@
 #include "modules/fps/fps.h"
 #include "modules/close_animation/close_animation.h"
 #include "modules/window_motion/window_motion.h"
+#include "modules/lua/lua.h"
 
 #define CAMERA_ORBIT_SENS 0.005f
 #define CAMERA_PAN_SENS 0.0025f
@@ -242,6 +243,7 @@ static bool bind_matches(const struct shady_keybind *bind,
 static bool handle_keybinding(struct shady_server *server,
 		xkb_keysym_t sym, uint32_t modifiers) {
 	struct shady_config *c = &server->config;
+	if (shady_lua_handle_key(server, sym, modifiers)) return true;
 	if (bind_matches(&c->bind_debug_ray, sym, modifiers)) {
 		server->debug_ray = !server->debug_ray;
 		shady_render_schedule_all_outputs(server);
