@@ -30,3 +30,26 @@ shady.config("bind.camera_zoom_out", "Alt+minus")
 shady.config("bind.camera_reset", "Alt+0")
 
 shady.log("development config loaded")
+
+-- Runtime scripting examples.
+shady_events = {
+  window_map = function(window)
+    shady.log("window mapped: " .. window.app_id .. " / " .. window.title)
+  end,
+  window_unmap = function(window)
+    shady.log("window unmapped: " .. window.app_id)
+  end,
+}
+
+shady.bind("F6", function()
+  shady.toggle_gravity()
+  shady.log("gravity toggled from Lua")
+end)
+
+shady.bind("F7", function()
+  shady.toggle_fps()
+end)
+
+shady.bind("Ctrl+Alt+q", function()
+  shady.quit()
+end)
