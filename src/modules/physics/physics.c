@@ -3,6 +3,7 @@
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_xdg_shell.h>
+#include <wlr/types/wlr_output.h>
 #include "../../render/render.h"
 #include "../window_motion/window_motion.h"
 #include "../fps/fps.h"
@@ -139,9 +140,6 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 		if(shady_fps_is_holding(server,t)||shady_fps_is_expanded(server,t)){shady_physics_stop(t);continue;}
 		struct wlr_surface *surface=t->xdg_toplevel->base->surface;
 		if(!surface->mapped)continue;
-		if(center_y < WINDOW_RESPAWN_Y || fabsf(t->transform.z) > WINDOW_RESPAWN_Z_LIMIT){
-			shady_physics_respawn_window(server,t);continue;
-		}
 		float tw=(float)surface->current.width,th=(float)surface->current.height;
 		if(tw<=0.f||th<=0.f)continue;
 		/* Folded FPS windows are authoritative cubes. Collision deliberately
@@ -150,6 +148,9 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 		const float cube_size=SHADY_FPS_CUBE_SIZE;
 		float center_x=((float)t->scene_tree->node.x+tw*.5f-logical_w*.5f)/logical_h;
 		float center_y=.5f-((float)t->scene_tree->node.y+th*.5f)/logical_h;
+		if(center_y < WINDOW_RESPAWN_Y || fabsf(t->transform.z) > WINDOW_RESPAWN_Z_LIMIT){
+			shady_physics_respawn_window(server,t);continue;
+		}
 		float half_x=cube_size*.5f,half_h=cube_size*.5f,half_z=cube_size*.5f;
 		float previous_bottom=center_y-half_h;
 		t->physics.vy-=WINDOW_GRAVITY*dt;
