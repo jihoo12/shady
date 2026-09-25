@@ -102,12 +102,28 @@ void shady_fps_update(struct shady_server*s,float dt){
 		if(c->vel_y<=0.f&&previous_feet>=y&&next_feet<=y&&shady_box_overlap_xz(b,&feet)&&(!landed||y>support_y)){support_y=y;landed=true;}}
 	if(landed){c->pos_y=support_y+EYE_HEIGHT;c->vel_y=0.f;c->grounded=true;}else c->grounded=false;
 }
-void shady_fps_update_held_window(struct shady_server*s,float lw,float lh){struct shady_toplevel*t=s->fps.held_toplevel;if(!s->camera.first_person||!t)return;struct wlr_surface*surface=t->xdg_toplevel->base->surface;if(!surface->mapped||lh<=0){s->fps.held_toplevel=NULL;return;}struct shady_vec3 eye,f;shady_camera_eye(&s->camera,&eye);shady_camera_basis(&s->camera,NULL,NULL,&f);float d=s->fps.hold_distance,hx=eye.x+f.x*d,hy=eye.y+f.y*d,hz=eye.z+f.z*d,tw=(float)surface->current.width,th=(float)surface->current.height,ww=tw/lh,wh=th/lh;
-float lx=s->fps.grab_local_x*ww,ly=s->fps.grab_local_y*wh,lz=s->fps.grab_local_z*(14.f/lh);
-float pitch=-s->camera.pitch,yaw=s->camera.yaw,cp=cosf(pitch),sp=sinf(pitch),cyaw=cosf(yaw),syaw=sinf(yaw);
-float ry=ly*cp-lz*sp,rz=ly*sp+lz*cp;
-float ox=lx*cyaw+rz*syaw,oz=-lx*syaw+rz*cyaw;
-float cx=hx-ox,cy=hy-ry,cz=hz-oz;int x=(int)((cx-ww*.5f)*lh+lw*.5f),y=(int)(lh*.5f-(cy-wh*.5f+wh)*lh);wlr_scene_node_set_position(&t->scene_tree->node,x,y);t->transform.z=cz;t->motion.tilt_x=-s->camera.pitch;t->motion.tilt_y=s->camera.yaw;t->motion.tilt_vx=t->motion.tilt_vy=0;if(s->config.window_wobble){t->motion.wobble_vx+=f.x*.00045f;t->motion.wobble_vy+=f.y*.00045f;}}
+void shady_fps_update_held_window(struct shady_server*s,float lw,float lh){
+	struct shady_toplevel*t=s->fps.held_toplevel;if(!s->camera.first_person||!t)return;
+	struct wlr_surface*surface=t->xdg_toplevel->base->surface;
+	if(!surface->mapped||lh<=0){s->fps.held_toplevel=NULL;return;}
+	struct shady_vec3 eye,f;shady_camera_eye(&s->camera,&eye);shady_camera_basis(&s->camera,NULL,NULL,&f);
+	float d=s->fps.hold_distance,tw=(float)surface->current.width,th=(float)surface->current.height;
+	float target[3]={eye.x+f.x*d,eye.y+f.y*d,eye.z+f.z*d};
+	float current[3]={
+		((float)t->scene_tree->node.x+tw*.5f-lw*.5f)/lh,
+		.5f-((float)t->scene_tree->node.y+th*.5f)/lh,
+		t->transform.z
+	};
+	/* A held folded window is still the same authoritative cube. Camera
+	 * rotation requests a target position; world collision clips that motion. */
+	shady_physics_move_cube(&s->world,current,target,SHADY_FPS_CUBE_SIZE*.5f);
+	int x=(int)(current[0]*lh+lw*.5f-tw*.5f);
+	int y=(int)((.5f-current[1])*lh-th*.5f);
+	wlr_scene_node_set_position(&t->scene_tree->node,x,y);t->transform.z=current[2];
+	/* Keep the visual cube axis-aligned while held so its rendered body and
+	 * collision/debug box cannot diverge as the camera rotates. */
+	t->motion.tilt_x=t->motion.tilt_y=0.f;t->motion.tilt_vx=t->motion.tilt_vy=0.f;
+}
 void shady_fps_toplevel_gone(struct shady_server*s,struct shady_toplevel*t){
 	if(s->fps.held_toplevel==t)s->fps.held_toplevel=NULL;
 	if(s->fps.expanded_toplevel==t)s->fps.expanded_toplevel=NULL;
