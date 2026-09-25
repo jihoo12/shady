@@ -5,6 +5,7 @@ project('shady', 'c', version: '0.1.0',
 wlroots = dependency('wlroots-0.20', version: ['>=0.20.2', '<0.21'])
 egl = dependency('egl')
 glesv2 = dependency('glesv2')
+lua = dependency('lua', version: '>=5.4')
 shader_dir = join_paths(meson.project_source_root(), 'shaders')
 
 shady_sources = [
@@ -18,6 +19,7 @@ shady_sources = [
   'src/render/math3d.c',
   'src/render/pick3d.c',
   'src/modules/environment/environment.c',
+  'src/modules/lua/lua.c',
   'src/assets/mesh.c',
   'src/assets/obj.c',
 ]
@@ -62,6 +64,7 @@ executable('shady',
     dependency('xkbcommon'),
     egl,
     glesv2,
+    lua,
     meson.get_compiler('c').find_library('m', required: true),
   ],
   install: true)
