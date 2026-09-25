@@ -19,12 +19,29 @@ f 5 6 8
 f 8 6 7
 
 
-# Collision proxy: intentionally separate from visual wedge geometry.
-# Thin top slab so the test object is a walkable platform without filling its
-# entire visual bounding box.
-g collision_platform
-v -0.75 -0.24 -1.60
-v  0.75 -0.24 -1.60
+# Collision proxy: low-poly closed shell matching the visual wedge.
+# Keep collision geometry separate so visual detail can grow independently.
+g collision_room
+v -0.75 -0.62 -1.60
+v  0.75 -0.62 -1.60
+v  0.75 -0.62 -0.40
+v -0.75 -0.62 -0.40
+v -0.75  0.10 -1.60
+v  0.75  0.10 -1.60
 v  0.75 -0.20 -0.40
 v -0.75 -0.20 -0.40
-f 9 10 11 12
+# front / back / sides
+f 9 10 13
+f 13 10 14
+f 10 11 14
+f 14 11 15
+f 11 12 15
+f 15 12 16
+f 12 9 16
+f 16 9 13
+# sloped top
+f 13 14 16
+f 16 14 15
+# bottom closes the proxy for two-sided world contact/debugging
+f 12 11 10
+f 12 10 9
