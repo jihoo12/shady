@@ -17,7 +17,7 @@
             nativeBuildInputs = with pkgs; [ pkg-config meson ninja wayland-scanner ];
             buildInputs = with pkgs; [
               wlroots wayland wayland-protocols libxkbcommon pixman libdrm
-              mesa libglvnd libffi libxau libxdmcp
+              mesa libglvnd libffi libxau libxdmcp lua5_4
             ];
             packages = with pkgs; [ stdenv.cc foot ];
           };
