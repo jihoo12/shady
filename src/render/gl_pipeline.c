@@ -1,4 +1,5 @@
 #include "gl_pipeline.h"
+#include "math3d.h"
 
 #include <stdio.h>
 #include <stdlib.h>
