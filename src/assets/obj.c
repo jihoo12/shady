@@ -157,3 +157,65 @@ bool shady_obj_load(const char *path, struct shady_mesh *mesh) {
 		mesh->bounds_max[0],mesh->bounds_max[1],mesh->bounds_max[2]);
 	return true;
 }
+
+
+bool shady_obj_load_colliders(const char *path,
+		struct shady_box_collider *colliders, size_t capacity, size_t *count) {
+	if (count) *count=0;
+	FILE *f=fopen(path,"r");
+	if (!f) return false;
+	struct vec3 *pos=NULL; size_t pos_n=0,pos_cap=0;
+	char *line=NULL; size_t line_cap=0; ssize_t len;
+	bool ok=true, active=false, have_bounds=false;
+	struct shady_box_collider box={0}; size_t out_n=0;
+
+	#define FLUSH_COLLIDER() do { \
+		if (active && have_bounds) { \
+			if (out_n >= capacity) { ok=false; } \
+			else colliders[out_n++]=box; \
+		} \
+		have_bounds=false; \
+	} while (0)
+
+	while (ok && (len=getline(&line,&line_cap,f)) >= 0) {
+		(void)len;
+		char *p=line; while (isspace((unsigned char)*p)) p++;
+		if (p[0]=='v' && isspace((unsigned char)p[1])) {
+			struct vec3 v;
+			if (sscanf(p+1,"%f %f %f",&v.x,&v.y,&v.z)!=3 ||
+					!grow((void**)&pos,&pos_cap,pos_n,sizeof(*pos))) { ok=false; break; }
+			pos[pos_n++]=v;
+		} else if ((p[0]=='g'||p[0]=='o') && isspace((unsigned char)p[1])) {
+			FLUSH_COLLIDER();
+			char name[256]={0};
+			if (sscanf(p+1,"%255s",name)==1)
+				active=!strncmp(name,"collision_",10);
+			else active=false;
+		} else if (active && p[0]=='f' && isspace((unsigned char)p[1])) {
+			char *save=NULL,*tok=strtok_r(p+1," \t\r\n",&save);
+			while (tok) {
+				if (*tok=='#') break;
+				struct obj_ref r;
+				if (!parse_ref(tok,&r)) { ok=false; break; }
+				int i=resolve_index(r.v,pos_n);
+				if (i<0) { ok=false; break; }
+				struct vec3 v=pos[i];
+				if (!have_bounds) {
+					box=(struct shady_box_collider){v.x,v.x,v.y,v.y,v.z,v.z};
+					have_bounds=true;
+				} else {
+					if(v.x<box.min_x)box.min_x=v.x;if(v.x>box.max_x)box.max_x=v.x;
+					if(v.y<box.min_y)box.min_y=v.y;if(v.y>box.max_y)box.max_y=v.y;
+					if(v.z<box.min_z)box.min_z=v.z;if(v.z>box.max_z)box.max_z=v.z;
+				}
+				tok=strtok_r(NULL," \t\r\n",&save);
+			}
+		}
+	}
+	if (ok) FLUSH_COLLIDER();
+	#undef FLUSH_COLLIDER
+	free(line); free(pos); fclose(f);
+	if (count) *count=out_n;
+	if (ok) wlr_log(WLR_INFO,"obj: loaded %zu collision groups from %s",out_n,path);
+	return ok;
+}
