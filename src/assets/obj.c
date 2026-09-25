@@ -216,7 +216,7 @@ bool shady_obj_load_colliders(const char *path,
 	#undef FLUSH_COLLIDER
 	free(line); free(pos); fclose(f);
 	if (count) *count=out_n;
-	if (ok) wlr_log(WLR_INFO,"obj: loaded %zu collision groups from %s",out_n,path);
+	if (ok) wlr_log(WLR_INFO,"[SHADY COLLISION] 📦 OBJ groups: %zu  file: %s",out_n,path);
 	return ok;
 }
 
@@ -255,6 +255,6 @@ bool shady_obj_load_collision_triangles(const char *path,
 		}
 	}
 	free(line);free(pos);fclose(f);if(count)*count=out_n;
-	if(ok)wlr_log(WLR_INFO,"obj: loaded %zu collision triangles from %s",out_n,path);
+	if(ok)wlr_log(WLR_INFO,"[SHADY COLLISION] 🔺 OBJ triangles: %zu  file: %s",out_n,path);
 	return ok;
 }
