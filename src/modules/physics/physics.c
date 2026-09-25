@@ -49,20 +49,13 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 		if(!surface->mapped)continue;
 		float tw=(float)surface->current.width,th=(float)surface->current.height;
 		if(tw<=0.f||th<=0.f)continue;
-		float world_w=tw/logical_h,world_h=th/logical_h;
-		if(server->camera.first_person){world_w=.16f;world_h=.16f;}
+		/* Folded FPS windows are authoritative cubes. Collision deliberately
+		 * ignores visual tilt so a wobble cannot shrink the support footprint or
+		 * move the bottom face through the floor. */
+		const float cube_size=.16f;
 		float center_x=((float)t->scene_tree->node.x+tw*.5f-logical_w*.5f)/logical_h;
 		float center_y=.5f-((float)t->scene_tree->node.y+th*.5f)/logical_h;
-		float tilt_x=0.f,tilt_y=0.f;shady_window_motion_get_tilt(t,&tilt_x,&tilt_y);
-		float sx=sinf(tilt_x),cx=cosf(tilt_x),sy=sinf(tilt_y);
-		float half_h=fabsf(cx)*world_h*.5f+fabsf(sx*sy)*world_w*.5f;
-		if(half_h<.012f)half_h=.012f;
-		/* Conservative XZ footprint of the tilted window. This keeps collision
-		 * active while any part of the window still overlaps the finite floor. */
-		float half_x=fabsf(cosf(tilt_y))*world_w*.5f;
-		float half_z=fabsf(sinf(tilt_y))*world_w*.5f + fabsf(sinf(tilt_x))*world_h*.5f;
-		if(half_x<.006f)half_x=.006f;
-		if(half_z<.006f)half_z=.006f;
+		float half_x=cube_size*.5f,half_h=cube_size*.5f,half_z=cube_size*.5f;
 		float previous_bottom = center_y - half_h;
 		t->physics.vy-=WINDOW_GRAVITY*dt;
 		center_y+=t->physics.vy*dt;
