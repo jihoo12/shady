@@ -46,8 +46,23 @@ shady.bind("F6", function()
   shady.log("gravity toggled from Lua")
 end)
 
+local all_expanded = false
 shady.bind("F7", function()
-  shady.toggle_fps()
+  all_expanded = not all_expanded
+  if all_expanded then shady.expand_all() else shady.fold_all() end
+end)
+
+shady.bind("F8", function()
+  local windows = shady.windows()
+  shady.log("alive windows: " .. #windows)
+  for i, window in ipairs(windows) do
+    shady.log(string.format("[%d] %s / %s  z=%.2f", i, window.app_id, window.title, window.z))
+  end
+end)
+
+shady.bind("F9", function()
+  shady.respawn_all()
+  shady.log("all windows respawned")
 end)
 
 shady.bind("Ctrl+Alt+q", function()
