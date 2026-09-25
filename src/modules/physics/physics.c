@@ -8,7 +8,6 @@
 #include "../fps/fps.h"
 #include "../../world/floor.h"
 #include "../../world/collider.h"
-#include "../../world/platform.h"
 #include "../../world/world.h"
 #define WINDOW_GRAVITY 2.8f
 
@@ -109,14 +108,19 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 			t->transform.z-half_z,t->transform.z+half_z
 		};
 		float support_y=0.f; bool supported=false;
-		/* Only land on a surface crossed while descending. XZ overlap alone must
-		 * never teleport a window upward onto an elevated platform. */
+		/* Keep resting windows attached to a support despite tiny frame-to-frame
+		 * body/tilt changes. For larger gaps still require an actual downward
+		 * crossing so elevated colliders cannot pull a window upward. */
 		if (t->physics.vy <= 0.f) {
+			const float contact_slop=.025f;
 			for (size_t i=0;i<server->world.collider_count;i++) {
 				const struct shady_box_collider *b=&server->world.colliders[i];
 				float y=b->max_y;
-				if(previous_bottom>=y && body.min_y<=y && shady_box_overlap_xz(b,&body) &&
-						(!supported || y>support_y)){support_y=y;supported=true;}
+				if(!shady_box_overlap_xz(b,&body))continue;
+				bool crossed=previous_bottom>=y && body.min_y<=y;
+				bool resting=previous_bottom>=y-contact_slop &&
+					previous_bottom<=y+contact_slop && body.min_y<=y+contact_slop;
+				if((crossed||resting)&&(!supported||y>support_y)){support_y=y;supported=true;}
 			}
 		}
 		float floor_center=support_y+half_h;
