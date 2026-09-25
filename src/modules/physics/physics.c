@@ -10,6 +10,8 @@
 #include "../../world/collider.h"
 #include "../../world/world.h"
 #define WINDOW_GRAVITY 2.8f
+#define WINDOW_RESPAWN_Y -3.0f
+#define WINDOW_RESPAWN_Z_LIMIT 12.0f
 
 static float dot3(const float a[3],const float b[3]){
 	return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
@@ -137,6 +139,9 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 		if(shady_fps_is_holding(server,t)||shady_fps_is_expanded(server,t)){shady_physics_stop(t);continue;}
 		struct wlr_surface *surface=t->xdg_toplevel->base->surface;
 		if(!surface->mapped)continue;
+		if(center_y < WINDOW_RESPAWN_Y || fabsf(t->transform.z) > WINDOW_RESPAWN_Z_LIMIT){
+			shady_physics_respawn_window(server,t);continue;
+		}
 		float tw=(float)surface->current.width,th=(float)surface->current.height;
 		if(tw<=0.f||th<=0.f)continue;
 		/* Folded FPS windows are authoritative cubes. Collision deliberately
@@ -220,6 +225,20 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 		wlr_scene_node_set_position(&t->scene_tree->node,x,y);
 	}
 }
+
+void shady_physics_respawn_window(struct shady_server *server,struct shady_toplevel *t){
+	if(!t)return;
+	struct wlr_surface *sf=t->xdg_toplevel->base->surface;
+	if(!sf||sf->current.height<=0)return;
+	float lw=(float)sf->current.width,lh=(float)sf->current.height;
+	if(!wl_list_empty(&server->outputs)){
+		struct shady_output *out=wl_container_of(server->outputs.next,out,link);
+		if(out->wlr_output&&out->wlr_output->scale>0.f){lw=(float)out->wlr_output->width/out->wlr_output->scale;lh=(float)out->wlr_output->height/out->wlr_output->scale;}
+	}
+	wlr_scene_node_set_position(&t->scene_tree->node,(int)(lw*.5f-sf->current.width*.5f),(int)(lh*.35f-sf->current.height*.5f));
+	t->transform.z=-.65f;shady_physics_stop(t);t->motion.tilt_x=t->motion.tilt_y=t->motion.tilt_vx=t->motion.tilt_vy=0.f;
+}
+void shady_physics_respawn_all(struct shady_server *server){struct shady_toplevel*t;wl_list_for_each(t,&server->toplevels,link)shady_physics_respawn_window(server,t);shady_render_schedule_all_outputs(server);}
 
 void shady_physics_set_velocity(struct shady_toplevel *toplevel,float vx,float vy,float vz){toplevel->physics.vx=vx;toplevel->physics.vy=vy;toplevel->physics.vz=vz;}
 void shady_physics_stop(struct shady_toplevel *toplevel){shady_physics_set_velocity(toplevel,0.f,0.f,0.f);}
