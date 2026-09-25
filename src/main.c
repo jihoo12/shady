@@ -24,6 +24,7 @@
 #include "render/render.h"
 #include "modules/physics/physics.h"
 #include "modules/environment/environment.h"
+#include "modules/lua/lua.h"
 
 static void default_config_path(char *buf, size_t size) {
 	const char *xdg = getenv("XDG_CONFIG_HOME");
@@ -75,6 +76,7 @@ int main(int argc, char *argv[]) {
 	if (!shady_environment_load_colliders(&server))
 		wlr_log(WLR_ERROR, "failed to load environment collision groups");
 	shady_physics_init(&server);
+	shady_lua_init(&server);
 	server.wl_display = wl_display_create();
 	if (!server.wl_display) {
 		return 1;
@@ -224,6 +226,7 @@ int main(int argc, char *argv[]) {
 
 	wl_list_remove(&server.new_output.link);
 
+	shady_lua_fini(&server);
 	shady_render_fini();
 
 	wl_event_source_remove(sigint);
