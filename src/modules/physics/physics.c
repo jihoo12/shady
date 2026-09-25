@@ -25,7 +25,6 @@ void shady_physics_toggle_gravity(struct shady_server *server) {
 void shady_physics_update(struct shady_server *server,float dt,float logical_w,float logical_h) {
 	if(!server->config.physics_enabled || !server->physics.gravity_enabled || !server->camera.first_person || dt<=0.f || logical_w<=0.f || logical_h<=0.f) return;
 	const float restitution=.22f, friction_rate=7.f, angular_kick=.22f;
-	const struct shady_world world=shady_world_default();
 	struct shady_toplevel *t;
 	wl_list_for_each(t,&server->toplevels,link) {
 		if(shady_fps_is_holding(server,t)){shady_physics_stop(t);continue;}
@@ -46,16 +45,26 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 		float half_z=fabsf(sinf(tilt_y))*world_w*.5f + fabsf(sinf(tilt_x))*world_h*.5f;
 		if(half_x<.006f)half_x=.006f;
 		if(half_z<.006f)half_z=.006f;
+		float previous_bottom = center_y - half_h;
 		t->physics.vy-=WINDOW_GRAVITY*dt; center_x+=t->physics.vx*dt; center_y+=t->physics.vy*dt; t->transform.z+=t->physics.vz*dt;
 		struct shady_box_collider body={
 			center_x-half_x,center_x+half_x,
 			center_y-half_h,center_y+half_h,
 			t->transform.z-half_z,t->transform.z+half_z
 		};
-		float support_y=0.f;
-		bool supported=shady_world_support_y(&world,&body,&support_y);
+		float support_y=0.f; bool supported=false;
+		/* Only land on a surface crossed while descending. XZ overlap alone must
+		 * never teleport a window upward onto an elevated platform. */
+		if (t->physics.vy <= 0.f) {
+			for (size_t i=0;i<server->world.collider_count;i++) {
+				const struct shady_box_collider *b=&server->world.colliders[i];
+				float y=b->max_y;
+				if(previous_bottom>=y && body.min_y<=y && shady_box_overlap_xz(b,&body) &&
+						(!supported || y>support_y)){support_y=y;supported=true;}
+			}
+		}
 		float floor_center=support_y+half_h;
-		if(supported && center_y<=floor_center){
+		if(supported){
 			float impact=-t->physics.vy;center_y=floor_center;
 			if(impact>.12f){t->physics.vy=impact*restitution;float side=sinf(tilt_y)>=0.f?1.f:-1.f;shady_window_motion_add_impulse(server,t,side*impact*.018f,impact*.035f,side*impact*angular_kick,-sinf(tilt_x)*impact*angular_kick);}
 			else t->physics.vy=0.f;

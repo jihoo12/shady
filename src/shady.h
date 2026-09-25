@@ -9,6 +9,7 @@
 #include <xkbcommon/xkbcommon.h>
 
 #include "render/math3d.h"
+#include "world/world.h"
 #include "modules/fps/state.h"
 #include "modules/physics/state.h"
 #include "modules/window_motion/state.h"
@@ -113,6 +114,7 @@ struct shady_server {
 
 	struct shady_camera camera;
 	struct shady_config config;
+	struct shady_world world;
 	double cam_grab_x, cam_grab_y;
 	float cam_grab_yaw, cam_grab_pitch;
 	float cam_grab_target_x, cam_grab_target_y, cam_grab_target_z;

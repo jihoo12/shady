@@ -62,7 +62,7 @@ static bool player_step_y(const struct shady_world*w,float x,float feet_y,float 
 }
 void shady_fps_update(struct shady_server*s,float dt){
 	struct shady_camera*c=&s->camera;if(!c->first_person)return;
-	struct shady_world world=shady_world_default();
+	const struct shady_world *world = &s->world;
 	float sy=sinf(c->yaw),cy=cosf(c->yaw),fx=-sy,fz=-cy,rx=cy,rz=-sy,mx=0,mz=0;
 	if(s->fps.forward){mx+=fx;mz+=fz;}if(s->fps.back){mx-=fx;mz-=fz;}if(s->fps.right){mx+=rx;mz+=rz;}if(s->fps.left){mx-=rx;mz-=rz;}
 	float ml=sqrtf(mx*mx+mz*mz);
@@ -72,17 +72,17 @@ void shady_fps_update(struct shady_server*s,float dt){
 		 * box sides and naturally slides along them. A grounded player may
 		 * replace a blocked move with a small step onto the collider. */
 		float nx=c->pos_x+dx;
-		if(!player_hits_solid(&world,nx,c->pos_y,c->pos_z))c->pos_x=nx;
-		else if(c->grounded&&player_step_y(&world,nx,feet,c->pos_z,&step)){c->pos_y=step+EYE_HEIGHT;c->pos_x=nx;c->vel_y=0.f;}
+		if(!player_hits_solid(world,nx,c->pos_y,c->pos_z))c->pos_x=nx;
+		else if(c->grounded&&player_step_y(world,nx,feet,c->pos_z,&step)){c->pos_y=step+EYE_HEIGHT;c->pos_x=nx;c->vel_y=0.f;}
 		float nz=c->pos_z+dz;feet=c->pos_y-EYE_HEIGHT;
-		if(!player_hits_solid(&world,c->pos_x,c->pos_y,nz))c->pos_z=nz;
-		else if(c->grounded&&player_step_y(&world,c->pos_x,feet,nz,&step)){c->pos_y=step+EYE_HEIGHT;c->pos_z=nz;c->vel_y=0.f;}
+		if(!player_hits_solid(world,c->pos_x,c->pos_y,nz))c->pos_z=nz;
+		else if(c->grounded&&player_step_y(world,c->pos_x,feet,nz,&step)){c->pos_y=step+EYE_HEIGHT;c->pos_z=nz;c->vel_y=0.f;}
 	}
 	if(s->fps.jump_queued&&c->grounded){c->vel_y=JUMP_SPEED;c->grounded=false;}s->fps.jump_queued=false;
 	float previous_feet=c->pos_y-EYE_HEIGHT;c->vel_y-=GRAVITY*dt;c->pos_y+=c->vel_y*dt;float next_feet=c->pos_y-EYE_HEIGHT;
 	struct shady_box_collider feet={c->pos_x-PLAYER_RADIUS,c->pos_x+PLAYER_RADIUS,next_feet,next_feet,c->pos_z-PLAYER_RADIUS,c->pos_z+PLAYER_RADIUS};
 	bool landed=false;float support_y=0.f;
-	for(size_t i=0;i<world.collider_count;i++){const struct shady_box_collider*b=&world.colliders[i];float y=b->max_y;
+	for(size_t i=0;i<world->collider_count;i++){const struct shady_box_collider*b=world->colliders[i];float y=b->max_y;
 		if(c->vel_y<=0.f&&previous_feet>=y&&next_feet<=y&&shady_box_overlap_xz(b,&feet)&&(!landed||y>support_y)){support_y=y;landed=true;}}
 	if(landed){c->pos_y=support_y+EYE_HEIGHT;c->vel_y=0.f;c->grounded=true;}else c->grounded=false;
 }

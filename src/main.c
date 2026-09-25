@@ -70,6 +70,7 @@ int main(int argc, char *argv[]) {
 		config_path = config_buf;
 	}
 	shady_config_load(&server.config, config_path);
+	server.world = shady_world_default();
 	shady_physics_init(&server);
 	server.wl_display = wl_display_create();
 	if (!server.wl_display) {
