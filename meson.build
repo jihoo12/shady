@@ -5,7 +5,15 @@ project('shady', 'c', version: '0.1.0',
 wlroots = dependency('wlroots-0.20', version: ['>=0.20.2', '<0.21'])
 egl = dependency('egl')
 glesv2 = dependency('glesv2')
-lua = dependency('lua', version: '>=5.4')
+# Nixpkgs' Lua 5.4 exposes lua54.pc rather than the generic lua.pc on
+# configurations where multiple Lua ABIs can coexist.
+lua = dependency('lua54', version: '>=5.4', required: false)
+if not lua.found()
+  lua = dependency('lua-5.4', version: '>=5.4', required: false)
+endif
+if not lua.found()
+  lua = dependency('lua5.4', version: '>=5.4')
+endif
 shader_dir = join_paths(meson.project_source_root(), 'shaders')
 
 shady_sources = [
