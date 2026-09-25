@@ -13,6 +13,8 @@ void shady_physics_toggle_gravity(struct shady_server *server);
 void shady_physics_update(struct shady_server *server, float dt, float logical_w, float logical_h);
 void shady_physics_set_velocity(struct shady_toplevel *toplevel, float vx, float vy, float vz);
 void shady_physics_stop(struct shady_toplevel *toplevel);
+void shady_physics_respawn_window(struct shady_server *server, struct shady_toplevel *toplevel);
+void shady_physics_respawn_all(struct shady_server *server);
 /* Move an authoritative FPS cube through the static world without tunneling.
  * Used by both free physics and the held-window kinematic path. */
 void shady_physics_move_cube(const struct shady_world *world,float center[3],
