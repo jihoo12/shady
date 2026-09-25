@@ -1,6 +1,6 @@
 # shady
 
-![Shady 3D desktop](screenshots/Screenshot3.png)
+![Shady 3D desktop](screenshots/Screenshot.png)
 
 Shady is a small experimental **3D Wayland compositor** built on wlroots 0.20.2 and inspired by TinyWL.
 
