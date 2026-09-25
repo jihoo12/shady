@@ -55,6 +55,11 @@ bool shady_environment_load_colliders(struct shady_server*s){
 	struct shady_box_collider boxes[SHADY_WORLD_MAX_COLLIDERS]; size_t n=0;
 	if(!shady_obj_load_colliders(s->config.environment_obj_path,boxes,SHADY_WORLD_MAX_COLLIDERS,&n))return false;
 	for(size_t i=0;i<n;i++)if(!shady_world_add_collider(&s->world,boxes[i]))return false;
+	struct shady_triangle_collider tris[SHADY_WORLD_MAX_TRIANGLES];size_t tn=0;
+	if(!shady_obj_load_collision_triangles(s->config.environment_obj_path,
+			tris,SHADY_WORLD_MAX_TRIANGLES,&tn))return false;
+	for(size_t i=0;i<tn;i++)if(!shady_world_add_triangle(&s->world,&tris[i]))return false;
+	wlr_log(WLR_INFO,"environment: registered %zu collision triangles",tn);
 	return true;
 }
 void shady_environment_fini(void){if(mesh_vbo)glDeleteBuffers(1,&mesh_vbo);if(mesh_prog)glDeleteProgram(mesh_prog);if(tex)glDeleteTextures(1,&tex);if(vbo)glDeleteBuffers(1,&vbo);if(prog)glDeleteProgram(prog);mesh_vbo=mesh_prog=tex=vbo=prog=0;mesh_vertex_count=0;loaded_obj_path[0]=0;loaded_path[0]=0;}
