@@ -1297,6 +1297,34 @@ void shady_gl_pipeline_draw_debug_ray(
 	glUseProgram(0);
 }
 
+void shady_gl_pipeline_draw_debug_box(
+		struct shady_gl_pipeline *pipeline, const float vp[16],
+		const struct shady_box_collider *b, bool environment) {
+	GLfloat v[] = {
+		b->min_x,b->min_y,b->min_z, b->max_x,b->min_y,b->min_z,
+		b->max_x,b->min_y,b->min_z, b->max_x,b->min_y,b->max_z,
+		b->max_x,b->min_y,b->max_z, b->min_x,b->min_y,b->max_z,
+		b->min_x,b->min_y,b->max_z, b->min_x,b->min_y,b->min_z,
+		b->min_x,b->max_y,b->min_z, b->max_x,b->max_y,b->min_z,
+		b->max_x,b->max_y,b->min_z, b->max_x,b->max_y,b->max_z,
+		b->max_x,b->max_y,b->max_z, b->min_x,b->max_y,b->max_z,
+		b->min_x,b->max_y,b->max_z, b->min_x,b->max_y,b->min_z,
+		b->min_x,b->min_y,b->min_z, b->min_x,b->max_y,b->min_z,
+		b->max_x,b->min_y,b->min_z, b->max_x,b->max_y,b->min_z,
+		b->max_x,b->min_y,b->max_z, b->max_x,b->max_y,b->max_z,
+		b->min_x,b->min_y,b->max_z, b->min_x,b->max_y,b->max_z
+	};
+	glUseProgram(pipeline->debug_prog);
+	glUniformMatrix4fv(pipeline->debug_u_vp,1,GL_FALSE,vp);
+	if(environment)glUniform4f(pipeline->debug_u_color,1.f,.55f,.12f,1.f);
+	else glUniform4f(pipeline->debug_u_color,.18f,1.f,.45f,1.f);
+	glDisable(GL_BLEND); glDepthMask(GL_FALSE);
+	glBindBuffer(GL_ARRAY_BUFFER,0);
+	glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,v);
+	glEnableVertexAttribArray(0); glDrawArrays(GL_LINES,0,24);
+	glDisableVertexAttribArray(0); glDepthMask(GL_TRUE); glUseProgram(0);
+}
+
 bool shady_gl_pipeline_copy_texture(
 	struct shady_gl_pipeline *pipeline,
 	GLenum source_target,

@@ -821,6 +821,14 @@ void shady_render_output_frame(
 			shady_fps_is_holding(server, NULL) ? false : server->fps.held_toplevel != NULL);
 	}
 
+	if (server->debug_ray) {
+		/* The default floor/platform occupy the first two slots. Authored OBJ
+		 * collision groups are orange so they are easy to distinguish. */
+		for (size_t i=0;i<server->world.collider_count;i++)
+			shady_gl_pipeline_draw_debug_box(&pipeline,vp,
+				&server->world.colliders[i],i>=2);
+	}
+
 	if (server->debug_ray && server->camera.first_person) {
 		struct shady_vec3 eye, forward;
 		shady_camera_eye(&server->camera, &eye);
