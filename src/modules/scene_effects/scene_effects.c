@@ -5,11 +5,10 @@
 #include "../../render/gl_pipeline.h"
 #include "../../render/math3d.h"
 #include "../../world/floor.h"
-#include "../../world/platform.h"
 
 void shady_scene_effects_draw_floor(struct shady_server *server,
 		struct shady_gl_pipeline *pipeline,const float vp[16]) {
-	if (server->config.floor) { struct shady_floor floor=shady_world_floor(); struct shady_box_collider platform=shady_world_test_platform(); shady_gl_pipeline_draw_floor(pipeline,vp,&floor); shady_gl_pipeline_draw_platform(pipeline,vp,&platform); }
+	if (server->config.floor) { struct shady_floor floor=shady_world_floor(); shady_gl_pipeline_draw_floor(pipeline,vp,&floor); }
 }
 
 void shady_scene_effects_draw_shadows(struct shady_server *server,

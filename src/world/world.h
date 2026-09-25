@@ -3,7 +3,6 @@
 #include <stddef.h>
 #include "collider.h"
 #include "floor.h"
-#include "platform.h"
 
 #define SHADY_WORLD_MAX_COLLIDERS 32
 
@@ -26,7 +25,6 @@ static inline struct shady_world shady_world_default(void) {
 	struct shady_world world = {0};
 	struct shady_floor floor = shady_world_floor();
 	shady_world_add_collider(&world, shady_floor_collider(&floor));
-	shady_world_add_collider(&world, shady_world_test_platform());
 	return world;
 }
 

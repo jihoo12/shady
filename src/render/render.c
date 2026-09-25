@@ -826,7 +826,7 @@ void shady_render_output_frame(
 		 * collision groups are orange so they are easy to distinguish. */
 		for (size_t i=0;i<server->world.collider_count;i++)
 			shady_gl_pipeline_draw_debug_box(&pipeline,vp,
-				&server->world.colliders[i],i>=2);
+				&server->world.colliders[i],i>=1);
 		struct shady_toplevel *debug_t;
 		wl_list_for_each(debug_t,&server->toplevels,link){
 			struct wlr_surface *ds=debug_t->xdg_toplevel->base->surface;
