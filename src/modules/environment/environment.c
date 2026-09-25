@@ -16,6 +16,9 @@ static GLsizei mesh_vertex_count;
 static GLint mesh_u_vp, mesh_u_light;
 static char loaded_obj_path[512];
 
+static GLuint shader(GLenum type, const char *s);
+
+
 static bool make_mesh_program(void) {
 	const char *vs="attribute vec3 a_pos; attribute vec3 a_normal; uniform mat4 u_vp; varying vec3 v_normal; void main(){v_normal=a_normal; gl_Position=u_vp*vec4(a_pos,1.); gl_Position.y=-gl_Position.y;}";
 	const char *fs="precision mediump float; uniform vec3 u_light; varying vec3 v_normal; void main(){float d=max(dot(normalize(v_normal),normalize(u_light)),0.); vec3 c=vec3(.18,.28,.38)*(.28+.72*d); gl_FragColor=vec4(c,1.);}";

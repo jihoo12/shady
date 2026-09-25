@@ -57,7 +57,8 @@ static bool player_step_y(const struct shady_world*w,float x,float feet_y,float 
 		const struct shady_box_collider*b=&w->colliders[i];float rise=b->max_y-feet_y;
 		if(rise>.001f&&rise<=STEP_HEIGHT&&shady_box_overlap_xz(b,&foot)&&(!found||b->max_y>best)){best=b->max_y;found=true;}
 	}
-	if(found&&out)*out=best;return found;
+	if (found && out) *out = best;
+	return found;
 }
 void shady_fps_update(struct shady_server*s,float dt){
 	struct shady_camera*c=&s->camera;if(!c->first_person)return;
