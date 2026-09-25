@@ -834,6 +834,11 @@ void shady_render_output_frame(
 		for (size_t i=0;i<server->world.collider_count;i++)
 			shady_gl_pipeline_draw_debug_box(&pipeline,vp,
 				&server->world.colliders[i],i>=1);
+		/* Yellow edges are the actual authored collision_* faces. Orange boxes
+		 * are only their coarse broad-phase bounds. */
+		for(size_t i=0;i<server->world.triangle_count;i++)
+			shady_gl_pipeline_draw_debug_triangle(&pipeline,vp,
+				&server->world.triangles[i]);
 		struct shady_toplevel *debug_t;
 		wl_list_for_each(debug_t,&server->toplevels,link){
 			struct wlr_surface *ds=debug_t->xdg_toplevel->base->surface;
