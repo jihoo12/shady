@@ -219,3 +219,42 @@ bool shady_obj_load_colliders(const char *path,
 	if (ok) wlr_log(WLR_INFO,"obj: loaded %zu collision groups from %s",out_n,path);
 	return ok;
 }
+
+
+bool shady_obj_load_collision_triangles(const char *path,
+		struct shady_triangle_collider *triangles,size_t capacity,size_t *count){
+	if(count)*count=0;
+	FILE*f=fopen(path,"r"); if(!f)return false;
+	struct vec3*pos=NULL;size_t pos_n=0,pos_cap=0,out_n=0;
+	char*line=NULL;size_t line_cap=0;ssize_t len;bool ok=true,active=false;
+	while(ok&&(len=getline(&line,&line_cap,f))>=0){
+		(void)len;char*p=line;while(isspace((unsigned char)*p))p++;
+		if(p[0]=='v'&&isspace((unsigned char)p[1])){
+			struct vec3 v;
+			if(sscanf(p+1,"%f %f %f",&v.x,&v.y,&v.z)!=3||
+			   !grow((void**)&pos,&pos_cap,pos_n,sizeof(*pos))){ok=false;break;}
+			pos[pos_n++]=v;
+		}else if((p[0]=='g'||p[0]=='o')&&isspace((unsigned char)p[1])){
+			char name[256]={0};
+			active=sscanf(p+1,"%255s",name)==1&&!strncmp(name,"collision_",10);
+		}else if(active&&p[0]=='f'&&isspace((unsigned char)p[1])){
+			struct obj_ref*refs=NULL;size_t n=0,cap=0;
+			char*save=NULL,*tok=strtok_r(p+1," \t\r\n",&save);
+			while(tok){
+				if(!grow((void**)&refs,&cap,n,sizeof(*refs))||!parse_ref(tok,&refs[n])){ok=false;break;}
+				n++;tok=strtok_r(NULL," \t\r\n",&save);
+			}
+			for(size_t k=1;ok&&k+1<n;k++){
+				int ids[3]={resolve_index(refs[0].v,pos_n),resolve_index(refs[k].v,pos_n),resolve_index(refs[k+1].v,pos_n)};
+				if(ids[0]<0||ids[1]<0||ids[2]<0||out_n>=capacity){ok=false;break;}
+				struct shady_triangle_collider*t=&triangles[out_n++];
+				for(int j=0;j<3;j++){struct vec3 v=pos[ids[j]];t->v[j][0]=v.x;t->v[j][1]=v.y;t->v[j][2]=v.z;}
+				for(int a=0;a<3;a++){t->min[a]=t->max[a]=t->v[0][a];for(int j=1;j<3;j++){if(t->v[j][a]<t->min[a])t->min[a]=t->v[j][a];if(t->v[j][a]>t->max[a])t->max[a]=t->v[j][a];}}
+			}
+			free(refs);
+		}
+	}
+	free(line);free(pos);fclose(f);if(count)*count=out_n;
+	if(ok)wlr_log(WLR_INFO,"obj: loaded %zu collision triangles from %s",out_n,path);
+	return ok;
+}
