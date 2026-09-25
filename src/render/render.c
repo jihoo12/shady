@@ -840,13 +840,26 @@ void shady_render_output_frame(
 			if(!ds->mapped)continue;
 			float dw=(float)ds->current.width,dh=(float)ds->current.height;
 			if(dw<=0.f||dh<=0.f)continue;
-			float dm[16];
 			if(server->camera.first_person&&!debug_t->fps_expanded){
-				float dx=(float)debug_t->scene_tree->node.x+ox,dy=(float)debug_t->scene_tree->node.y+oy;
-				float dcx=(dx+dw*.5f-logical_w*.5f)/logical_h,dcy=.5f-(dy+dh*.5f)/logical_h;
-				shady_window_cube_model(dm,dcx,dcy,debug_t->transform.z,SHADY_FPS_CUBE_SIZE,debug_t->motion.tilt_x,debug_t->motion.tilt_y);
-			}else shady_window_model(dm,(float)debug_t->scene_tree->node.x+ox,(float)debug_t->scene_tree->node.y+oy,dw,dh,logical_w,logical_h,debug_t->transform.z,debug_t->motion.tilt_x,debug_t->motion.tilt_y);
-			shady_gl_pipeline_draw_debug_window_body(&pipeline,vp,dm);
+				/* Debug the authoritative physics cube, not only the textured
+				 * window face. This shows all 12 edges / six collision faces. */
+				float dx=(float)debug_t->scene_tree->node.x+ox;
+				float dy=(float)debug_t->scene_tree->node.y+oy;
+				float dcx=(dx+dw*.5f-logical_w*.5f)/logical_h;
+				float dcy=.5f-(dy+dh*.5f)/logical_h;
+				float h=SHADY_FPS_CUBE_SIZE*.5f;
+				struct shady_box_collider cube={
+					dcx-h,dcx+h,dcy-h,dcy+h,
+					debug_t->transform.z-h,debug_t->transform.z+h
+				};
+				shady_gl_pipeline_draw_debug_box(&pipeline,vp,&cube,false);
+			}else{
+				float dm[16];
+				shady_window_model(dm,(float)debug_t->scene_tree->node.x+ox,
+					(float)debug_t->scene_tree->node.y+oy,dw,dh,logical_w,logical_h,
+					debug_t->transform.z,debug_t->motion.tilt_x,debug_t->motion.tilt_y);
+				shady_gl_pipeline_draw_debug_window_body(&pipeline,vp,dm);
+			}
 		}
 	}
 
