@@ -46,7 +46,45 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 		if(half_x<.006f)half_x=.006f;
 		if(half_z<.006f)half_z=.006f;
 		float previous_bottom = center_y - half_h;
-		t->physics.vy-=WINDOW_GRAVITY*dt; center_x+=t->physics.vx*dt; center_y+=t->physics.vy*dt; t->transform.z+=t->physics.vz*dt;
+		t->physics.vy-=WINDOW_GRAVITY*dt;
+		center_y+=t->physics.vy*dt;
+
+		/* Resolve horizontal motion one axis at a time. Using the previous
+		 * leading face makes thin authored OBJ wall proxies much harder to
+		 * tunnel through than an overlap-only test. */
+		float old_x=center_x, old_z=t->transform.z;
+		float next_x=center_x+t->physics.vx*dt;
+		for(size_t i=0;i<server->world.collider_count;i++){
+			const struct shady_box_collider*b=&server->world.colliders[i];
+			bool yz=center_y+half_h>b->min_y&&center_y-half_h<b->max_y&&
+				old_z+half_z>b->min_z&&old_z-half_z<b->max_z;
+			if(!yz)continue;
+			if(t->physics.vx>0.f&&old_x+half_x<=b->min_x&&next_x+half_x>=b->min_x){
+				next_x=b->min_x-half_x;t->physics.vx=-t->physics.vx*restitution;
+				shady_window_motion_add_impulse(server,t,-.018f,0.f,0.f,-angular_kick);break;
+			}
+			if(t->physics.vx<0.f&&old_x-half_x>=b->max_x&&next_x-half_x<=b->max_x){
+				next_x=b->max_x+half_x;t->physics.vx=-t->physics.vx*restitution;
+				shady_window_motion_add_impulse(server,t,.018f,0.f,0.f,angular_kick);break;
+			}
+		}
+		center_x=next_x;
+		float next_z=old_z+t->physics.vz*dt;
+		for(size_t i=0;i<server->world.collider_count;i++){
+			const struct shady_box_collider*b=&server->world.colliders[i];
+			bool xy=center_y+half_h>b->min_y&&center_y-half_h<b->max_y&&
+				center_x+half_x>b->min_x&&center_x-half_x<b->max_x;
+			if(!xy)continue;
+			if(t->physics.vz>0.f&&old_z+half_z<=b->min_z&&next_z+half_z>=b->min_z){
+				next_z=b->min_z-half_z;t->physics.vz=-t->physics.vz*restitution;
+				shady_window_motion_add_impulse(server,t,0.f,.018f,angular_kick,0.f);break;
+			}
+			if(t->physics.vz<0.f&&old_z-half_z>=b->max_z&&next_z-half_z<=b->max_z){
+				next_z=b->max_z+half_z;t->physics.vz=-t->physics.vz*restitution;
+				shady_window_motion_add_impulse(server,t,0.f,-.018f,-angular_kick,0.f);break;
+			}
+		}
+		t->transform.z=next_z;
 		struct shady_box_collider body={
 			center_x-half_x,center_x+half_x,
 			center_y-half_h,center_y+half_h,
