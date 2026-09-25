@@ -59,7 +59,7 @@ bool shady_environment_load_colliders(struct shady_server*s){
 	if(!shady_obj_load_collision_triangles(s->config.environment_obj_path,
 			tris,SHADY_WORLD_MAX_TRIANGLES,&tn))return false;
 	for(size_t i=0;i<tn;i++)if(!shady_world_add_triangle(&s->world,&tris[i]))return false;
-	wlr_log(WLR_INFO,"environment: registered %zu collision triangles",tn);
+	wlr_log(WLR_INFO,"[SHADY COLLISION] ✅ WORLD READY: %zu OBJ groups / %zu triangles registered",n,tn);
 	return true;
 }
 void shady_environment_fini(void){if(mesh_vbo)glDeleteBuffers(1,&mesh_vbo);if(mesh_prog)glDeleteProgram(mesh_prog);if(tex)glDeleteTextures(1,&tex);if(vbo)glDeleteBuffers(1,&vbo);if(prog)glDeleteProgram(prog);mesh_vbo=mesh_prog=tex=vbo=prog=0;mesh_vertex_count=0;loaded_obj_path[0]=0;loaded_path[0]=0;}
