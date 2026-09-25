@@ -11,6 +11,33 @@
 #include "../../world/world.h"
 #define WINDOW_GRAVITY 2.8f
 
+/* Sweep one cube axis against every world AABB. The other two axes must
+ * overlap, so each of the cube's six faces is an equally valid contact face. */
+static bool sweep_cube_axis(const struct shady_world *world,float center[3],
+		const float half[3],int axis,float delta,float *velocity,float restitution){
+	if(fabsf(delta)<1e-8f)return false;
+	int a=(axis+1)%3,b=(axis+2)%3;
+	float start=center[axis],next=start+delta,best=next;
+	bool hit=false;
+	for(size_t i=0;i<world->collider_count;i++){
+		const struct shady_box_collider*c=&world->colliders[i];
+		const float mn[3]={c->min_x,c->min_y,c->min_z};
+		const float mx[3]={c->max_x,c->max_y,c->max_z};
+		if(center[a]+half[a]<=mn[a]||center[a]-half[a]>=mx[a]||
+		   center[b]+half[b]<=mn[b]||center[b]-half[b]>=mx[b])continue;
+		if(delta>0.f&&start+half[axis]<=mn[axis]&&next+half[axis]>=mn[axis]){
+			float candidate=mn[axis]-half[axis];
+			if(!hit||candidate<best){best=candidate;hit=true;}
+		}else if(delta<0.f&&start-half[axis]>=mx[axis]&&next-half[axis]<=mx[axis]){
+			float candidate=mx[axis]+half[axis];
+			if(!hit||candidate>best){best=candidate;hit=true;}
+		}
+	}
+	center[axis]=hit?best:next;
+	if(hit)*velocity=-*velocity*restitution;
+	return hit;
+}
+
 bool shady_physics_window_body(const struct shady_toplevel *t,float logical_w,float logical_h,struct shady_window_body *body){
 	if(!t||!body||logical_h<=0.f)return false;
 	struct wlr_surface*s=t->xdg_toplevel->base->surface;
@@ -56,67 +83,30 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 		float center_x=((float)t->scene_tree->node.x+tw*.5f-logical_w*.5f)/logical_h;
 		float center_y=.5f-((float)t->scene_tree->node.y+th*.5f)/logical_h;
 		float half_x=cube_size*.5f,half_h=cube_size*.5f,half_z=cube_size*.5f;
-		float previous_bottom = center_y - half_h;
-		float previous_top = center_y + half_h;
+		float previous_bottom=center_y-half_h;
 		t->physics.vy-=WINDOW_GRAVITY*dt;
-		float next_y=center_y+t->physics.vy*dt;
 
-		/* Sweep the cube vertically as well as horizontally. This prevents a
-		 * fast throw from crossing a thin authored OBJ slab in one frame. */
-		for(size_t i=0;i<server->world.collider_count;i++){
-			const struct shady_box_collider*b=&server->world.colliders[i];
-			bool xz=center_x+half_x>b->min_x&&center_x-half_x<b->max_x&&
-				t->transform.z+half_z>b->min_z&&t->transform.z-half_z<b->max_z;
-			if(!xz)continue;
-			if(t->physics.vy<0.f&&previous_bottom>=b->max_y&&next_y-half_h<=b->max_y){
-				next_y=b->max_y+half_h;
-				t->physics.vy=-t->physics.vy*restitution;
-				break;
-			}
-			if(t->physics.vy>0.f&&previous_top<=b->min_y&&next_y+half_h>=b->min_y){
-				next_y=b->min_y-half_h;
-				t->physics.vy=-t->physics.vy*restitution;
-				break;
-			}
-		}
-		center_y=next_y;
+		/* Axis-separated swept AABB: -X/+X, -Y/+Y and -Z/+Z all use the
+		 * same collision path. This also chooses the nearest crossed face
+		 * instead of whichever collider happens to appear first. */
+		float center[3]={center_x,center_y,t->transform.z};
+		const float half[3]={half_x,half_h,half_z};
+		bool hit_y=sweep_cube_axis(&server->world,center,half,1,t->physics.vy*dt,
+			&t->physics.vy,restitution);
+		bool hit_x=sweep_cube_axis(&server->world,center,half,0,t->physics.vx*dt,
+			&t->physics.vx,restitution);
+		bool hit_z=sweep_cube_axis(&server->world,center,half,2,t->physics.vz*dt,
+			&t->physics.vz,restitution);
+		center_x=center[0];center_y=center[1];t->transform.z=center[2];
 
-		/* Resolve horizontal motion one axis at a time. Using the previous
-		 * leading face makes thin authored OBJ wall proxies much harder to
-		 * tunnel through than an overlap-only test. */
-		float old_x=center_x, old_z=t->transform.z;
-		float next_x=center_x+t->physics.vx*dt;
-		for(size_t i=0;i<server->world.collider_count;i++){
-			const struct shady_box_collider*b=&server->world.colliders[i];
-			bool yz=center_y+half_h>b->min_y&&center_y-half_h<b->max_y&&
-				old_z+half_z>b->min_z&&old_z-half_z<b->max_z;
-			if(!yz)continue;
-			if(t->physics.vx>0.f&&old_x+half_x<=b->min_x&&next_x+half_x>=b->min_x){
-				next_x=b->min_x-half_x;t->physics.vx=-t->physics.vx*restitution;
-				shady_window_motion_add_impulse(server,t,-.018f,0.f,0.f,-angular_kick);break;
-			}
-			if(t->physics.vx<0.f&&old_x-half_x>=b->max_x&&next_x-half_x<=b->max_x){
-				next_x=b->max_x+half_x;t->physics.vx=-t->physics.vx*restitution;
-				shady_window_motion_add_impulse(server,t,.018f,0.f,0.f,angular_kick);break;
-			}
-		}
-		center_x=next_x;
-		float next_z=old_z+t->physics.vz*dt;
-		for(size_t i=0;i<server->world.collider_count;i++){
-			const struct shady_box_collider*b=&server->world.colliders[i];
-			bool xy=center_y+half_h>b->min_y&&center_y-half_h<b->max_y&&
-				center_x+half_x>b->min_x&&center_x-half_x<b->max_x;
-			if(!xy)continue;
-			if(t->physics.vz>0.f&&old_z+half_z<=b->min_z&&next_z+half_z>=b->min_z){
-				next_z=b->min_z-half_z;t->physics.vz=-t->physics.vz*restitution;
-				shady_window_motion_add_impulse(server,t,0.f,.018f,angular_kick,0.f);break;
-			}
-			if(t->physics.vz<0.f&&old_z-half_z>=b->max_z&&next_z-half_z<=b->max_z){
-				next_z=b->max_z+half_z;t->physics.vz=-t->physics.vz*restitution;
-				shady_window_motion_add_impulse(server,t,0.f,-.018f,-angular_kick,0.f);break;
-			}
-		}
-		t->transform.z=next_z;
+		if(hit_x)shady_window_motion_add_impulse(server,t,
+			t->physics.vx>=0.f?.018f:-.018f,0.f,0.f,
+			t->physics.vx>=0.f?angular_kick:-angular_kick);
+		if(hit_z)shady_window_motion_add_impulse(server,t,0.f,
+			t->physics.vz>=0.f?.018f:-.018f,
+			t->physics.vz>=0.f?angular_kick:-angular_kick,0.f);
+		(void)hit_y;
+
 		struct shady_box_collider body={
 			center_x-half_x,center_x+half_x,
 			center_y-half_h,center_y+half_h,
