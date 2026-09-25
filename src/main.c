@@ -72,11 +72,12 @@ int main(int argc, char *argv[]) {
 		config_path = config_buf;
 	}
 	shady_config_load(&server.config, config_path);
+	/* Lua is allowed to override config before world/physics are built. */
+	shady_lua_init(&server);
 	server.world = shady_world_default();
 	if (!shady_environment_load_colliders(&server))
 		wlr_log(WLR_ERROR, "failed to load environment collision groups");
 	shady_physics_init(&server);
-	shady_lua_init(&server);
 	server.wl_display = wl_display_create();
 	if (!server.wl_display) {
 		return 1;
