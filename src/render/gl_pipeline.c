@@ -1300,6 +1300,23 @@ void shady_gl_pipeline_draw_debug_box(
 	glDisableVertexAttribArray(0); glDepthMask(GL_TRUE); glUseProgram(0);
 }
 
+void shady_gl_pipeline_draw_debug_triangle(
+		struct shady_gl_pipeline *pipeline,const float vp[16],
+		const struct shady_triangle_collider *t){
+	GLfloat v[]={
+		t->v[0][0],t->v[0][1],t->v[0][2], t->v[1][0],t->v[1][1],t->v[1][2],
+		t->v[1][0],t->v[1][1],t->v[1][2], t->v[2][0],t->v[2][1],t->v[2][2],
+		t->v[2][0],t->v[2][1],t->v[2][2], t->v[0][0],t->v[0][1],t->v[0][2]
+	};
+	glUseProgram(pipeline->debug_prog);
+	glUniformMatrix4fv(pipeline->debug_u_vp,1,GL_FALSE,vp);
+	glUniform4f(pipeline->debug_u_color,1.f,.95f,.15f,1.f);
+	glDisable(GL_BLEND);glDepthMask(GL_FALSE);glBindBuffer(GL_ARRAY_BUFFER,0);
+	glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,0,v);glEnableVertexAttribArray(0);
+	glDrawArrays(GL_LINES,0,6);glDisableVertexAttribArray(0);
+	glDepthMask(GL_TRUE);glUseProgram(0);
+}
+
 bool shady_gl_pipeline_copy_texture(
 	struct shady_gl_pipeline *pipeline,
 	GLenum source_target,
