@@ -57,8 +57,29 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 		float center_y=.5f-((float)t->scene_tree->node.y+th*.5f)/logical_h;
 		float half_x=cube_size*.5f,half_h=cube_size*.5f,half_z=cube_size*.5f;
 		float previous_bottom = center_y - half_h;
+		float previous_top = center_y + half_h;
 		t->physics.vy-=WINDOW_GRAVITY*dt;
-		center_y+=t->physics.vy*dt;
+		float next_y=center_y+t->physics.vy*dt;
+
+		/* Sweep the cube vertically as well as horizontally. This prevents a
+		 * fast throw from crossing a thin authored OBJ slab in one frame. */
+		for(size_t i=0;i<server->world.collider_count;i++){
+			const struct shady_box_collider*b=&server->world.colliders[i];
+			bool xz=center_x+half_x>b->min_x&&center_x-half_x<b->max_x&&
+				t->transform.z+half_z>b->min_z&&t->transform.z-half_z<b->max_z;
+			if(!xz)continue;
+			if(t->physics.vy<0.f&&previous_bottom>=b->max_y&&next_y-half_h<=b->max_y){
+				next_y=b->max_y+half_h;
+				t->physics.vy=-t->physics.vy*restitution;
+				break;
+			}
+			if(t->physics.vy>0.f&&previous_top<=b->min_y&&next_y+half_h>=b->min_y){
+				next_y=b->min_y-half_h;
+				t->physics.vy=-t->physics.vy*restitution;
+				break;
+			}
+		}
+		center_y=next_y;
 
 		/* Resolve horizontal motion one axis at a time. Using the previous
 		 * leading face makes thin authored OBJ wall proxies much harder to
