@@ -178,6 +178,7 @@ struct shady_keyboard {
 /* config.c */
 void shady_config_defaults(struct shady_config *config);
 bool shady_config_load(struct shady_config *config, const char *path);
+bool shady_config_set(struct shady_config *config,const char *key,const char *value);
 
 /* Shared helpers used across compositor modules */
 void focus_toplevel(struct shady_toplevel *toplevel);
