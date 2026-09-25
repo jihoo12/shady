@@ -11,46 +11,74 @@
 #include "../../world/world.h"
 #define WINDOW_GRAVITY 2.8f
 
+static float dot3(const float a[3],const float b[3]){
+	return a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+}
+static bool sat_axis(const float v[3][3],const float h[3],const float axis[3]){
+	float l2=dot3(axis,axis);if(l2<1e-12f)return true;
+	float p0=dot3(v[0],axis),p1=dot3(v[1],axis),p2=dot3(v[2],axis);
+	float mn=fminf(p0,fminf(p1,p2)),mx=fmaxf(p0,fmaxf(p1,p2));
+	float r=h[0]*fabsf(axis[0])+h[1]*fabsf(axis[1])+h[2]*fabsf(axis[2]);
+	return !(mn>r||mx<-r);
+}
 static bool triangle_cube_overlap(const struct shady_triangle_collider*t,const float c[3],const float h[3]){
-	/* Conservative narrow phase: triangle AABB against the dynamic cube.
-	 * Unlike the old group AABB this preserves per-face locality and is a
-	 * useful stepping stone to exact triangle/SAT contacts. */
-	for(int a=0;a<3;a++)if(t->max[a]<c[a]-h[a]||t->min[a]>c[a]+h[a])return false;
+	/* Exact triangle-vs-AABB SAT: 3 box axes, triangle normal, and the
+	 * 9 cross products between triangle edges and box axes. */
+	float v[3][3];for(int i=0;i<3;i++)for(int a=0;a<3;a++)v[i][a]=t->v[i][a]-c[a];
+	for(int a=0;a<3;a++){
+		float mn=fminf(v[0][a],fminf(v[1][a],v[2][a]));
+		float mx=fmaxf(v[0][a],fmaxf(v[1][a],v[2][a]));
+		if(mn>h[a]||mx<-h[a])return false;
+	}
+	float e[3][3];for(int i=0;i<3;i++)for(int a=0;a<3;a++)e[i][a]=v[(i+1)%3][a]-v[i][a];
+	float n[3]={e[0][1]*e[1][2]-e[0][2]*e[1][1],
+	            e[0][2]*e[1][0]-e[0][0]*e[1][2],
+	            e[0][0]*e[1][1]-e[0][1]*e[1][0]};
+	if(!sat_axis(v,h,n))return false;
+	const float box_axis[3][3]={{1,0,0},{0,1,0},{0,0,1}};
+	for(int i=0;i<3;i++)for(int j=0;j<3;j++){
+		float axis[3]={
+			e[i][1]*box_axis[j][2]-e[i][2]*box_axis[j][1],
+			e[i][2]*box_axis[j][0]-e[i][0]*box_axis[j][2],
+			e[i][0]*box_axis[j][1]-e[i][1]*box_axis[j][0]
+		};
+		if(!sat_axis(v,h,axis))return false;
+	}
 	return true;
 }
-
 static bool world_has_triangle_contact(const struct shady_world*w,const float c[3],const float h[3]){
-	for(size_t i=0;i<w->triangle_count;i++)if(triangle_cube_overlap(&w->triangles[i],c,h))return true;
+	for(size_t i=0;i<w->triangle_count;i++){
+		const struct shady_triangle_collider*t=&w->triangles[i];
+		bool broad=true;for(int a=0;a<3;a++)if(t->max[a]<c[a]-h[a]||t->min[a]>c[a]+h[a]){broad=false;break;}
+		if(broad&&triangle_cube_overlap(t,c,h))return true;
+	}
 	return false;
 }
 
-/* Sweep one cube axis against every world AABB. The other two axes must
- * overlap, so each of the cube's six faces is an equally valid contact face. */
+/* Axis-separated cube movement. Built-in box colliders retain their swept
+ * contact behavior. Authored OBJ group boxes are broad-phase/debug only;
+ * their actual faces are tested below with triangle SAT. */
 static bool sweep_cube_axis(const struct shady_world *world,float center[3],
 		const float half[3],int axis,float delta,float *velocity,float restitution){
 	if(fabsf(delta)<1e-8f)return false;
-	int a=(axis+1)%3,b=(axis+2)%3;
-	float start=center[axis],next=start+delta,best=next;
-	bool hit=false;
-	for(size_t i=0;i<world->collider_count;i++){
+	int a=(axis+1)%3,b=(axis+2)%3;float start=center[axis],next=start+delta,best=next;bool hit=false;
+	/* Slot zero is Shady's built-in floor. OBJ boxes follow it and must not
+	 * become solid volumes, otherwise slopes/empty space turn into walls. */
+	size_t box_count=world->triangle_count?1:world->collider_count;
+	for(size_t i=0;i<box_count;i++){
 		const struct shady_box_collider*c=&world->colliders[i];
-		const float mn[3]={c->min_x,c->min_y,c->min_z};
-		const float mx[3]={c->max_x,c->max_y,c->max_z};
+		const float mn[3]={c->min_x,c->min_y,c->min_z},mx[3]={c->max_x,c->max_y,c->max_z};
 		if(center[a]+half[a]<=mn[a]||center[a]-half[a]>=mx[a]||
 		   center[b]+half[b]<=mn[b]||center[b]-half[b]>=mx[b])continue;
 		if(delta>0.f&&start+half[axis]<=mn[axis]&&next+half[axis]>=mn[axis]){
-			float candidate=mn[axis]-half[axis],probe[3]={center[0],center[1],center[2]};
-			probe[axis]=candidate;
-			/* collider 0 is Shady's built-in floor. Authored OBJ boxes are only
-			 * broad phase now: accept them only where collision triangles exist. */
-			if(i>0&&world->triangle_count&&!world_has_triangle_contact(world,probe,half))continue;
-			if(!hit||candidate<best){best=candidate;hit=true;}
+			float q=mn[axis]-half[axis];if(!hit||q<best){best=q;hit=true;}
 		}else if(delta<0.f&&start-half[axis]>=mx[axis]&&next-half[axis]<=mx[axis]){
-			float candidate=mx[axis]+half[axis],probe[3]={center[0],center[1],center[2]};
-			probe[axis]=candidate;
-			if(i>0&&world->triangle_count&&!world_has_triangle_contact(world,probe,half))continue;
-			if(!hit||candidate>best){best=candidate;hit=true;}
+			float q=mx[axis]+half[axis];if(!hit||q>best){best=q;hit=true;}
 		}
+	}
+	if(!hit&&world->triangle_count){
+		float probe[3]={center[0],center[1],center[2]};probe[axis]=next;
+		if(world_has_triangle_contact(world,probe,half)){best=start;hit=true;}
 	}
 	center[axis]=hit?best:next;
 	if(hit)*velocity=-*velocity*restitution;
