@@ -82,7 +82,7 @@ void shady_fps_update(struct shady_server*s,float dt){
 	float previous_feet=c->pos_y-EYE_HEIGHT;c->vel_y-=GRAVITY*dt;c->pos_y+=c->vel_y*dt;float next_feet=c->pos_y-EYE_HEIGHT;
 	struct shady_box_collider feet={c->pos_x-PLAYER_RADIUS,c->pos_x+PLAYER_RADIUS,next_feet,next_feet,c->pos_z-PLAYER_RADIUS,c->pos_z+PLAYER_RADIUS};
 	bool landed=false;float support_y=0.f;
-	for(size_t i=0;i<world->collider_count;i++){const struct shady_box_collider*b=world->colliders[i];float y=b->max_y;
+	for(size_t i=0;i<world->collider_count;i++){const struct shady_box_collider*b=&world->colliders[i];float y=b->max_y;
 		if(c->vel_y<=0.f&&previous_feet>=y&&next_feet<=y&&shady_box_overlap_xz(b,&feet)&&(!landed||y>support_y)){support_y=y;landed=true;}}
 	if(landed){c->pos_y=support_y+EYE_HEIGHT;c->vel_y=0.f;c->grounded=true;}else c->grounded=false;
 }
