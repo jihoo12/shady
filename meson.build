@@ -19,6 +19,7 @@ shady_sources = [
   'src/render/pick3d.c',
   'src/modules/environment/environment.c',
   'src/assets/mesh.c',
+  'src/assets/obj.c',
 ]
 
 physics_enabled = get_option('physics').enabled()
