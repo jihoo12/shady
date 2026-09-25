@@ -52,7 +52,7 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 		/* Folded FPS windows are authoritative cubes. Collision deliberately
 		 * ignores visual tilt so a wobble cannot shrink the support footprint or
 		 * move the bottom face through the floor. */
-		const float cube_size=.16f;
+		const float cube_size=SHADY_FPS_CUBE_SIZE;
 		float center_x=((float)t->scene_tree->node.x+tw*.5f-logical_w*.5f)/logical_h;
 		float center_y=.5f-((float)t->scene_tree->node.y+th*.5f)/logical_h;
 		float half_x=cube_size*.5f,half_h=cube_size*.5f,half_z=cube_size*.5f;
