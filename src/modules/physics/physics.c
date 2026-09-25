@@ -44,12 +44,13 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 	const float restitution=.22f, friction_rate=7.f, angular_kick=.22f;
 	struct shady_toplevel *t;
 	wl_list_for_each(t,&server->toplevels,link) {
-		if(shady_fps_is_holding(server,t)){shady_physics_stop(t);continue;}
+		if(shady_fps_is_holding(server,t)||shady_fps_is_expanded(server,t)){shady_physics_stop(t);continue;}
 		struct wlr_surface *surface=t->xdg_toplevel->base->surface;
 		if(!surface->mapped)continue;
 		float tw=(float)surface->current.width,th=(float)surface->current.height;
 		if(tw<=0.f||th<=0.f)continue;
 		float world_w=tw/logical_h,world_h=th/logical_h;
+		if(server->camera.first_person){world_w=.16f;world_h=.16f;}
 		float center_x=((float)t->scene_tree->node.x+tw*.5f-logical_w*.5f)/logical_h;
 		float center_y=.5f-((float)t->scene_tree->node.y+th*.5f)/logical_h;
 		float tilt_x=0.f,tilt_y=0.f;shady_window_motion_get_tilt(t,&tilt_x,&tilt_y);

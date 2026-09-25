@@ -715,7 +715,13 @@ void shady_render_output_frame(
 			}
 		}
 
-		shady_window_model(
+		if(server->camera.first_person&&!toplevel->fps_expanded){
+			float cx=(layout_x+tw*.5f-logical_w*.5f)/logical_h;
+			float cy=.5f-(layout_y+th*.5f)/logical_h;
+			shady_window_cube_model(model,cx,cy,toplevel->transform.z,.16f,
+				toplevel->motion.tilt_x,toplevel->motion.tilt_y);
+		}else{
+			shady_window_model(
 			model,
 			layout_x,
 			layout_y,
@@ -727,6 +733,7 @@ void shady_render_output_frame(
 			toplevel->motion.tilt_x,
 			toplevel->motion.tilt_y
 		);
+		}
 
 		shady_mat4_multiply(
 			mvp,

@@ -12,5 +12,6 @@ struct shady_fps_state {
 	/* Grab anchor in normalized window-local coordinates, centered at 0. */
 	float grab_local_x, grab_local_y, grab_local_z;
 	bool input_capture;
+	struct shady_toplevel *expanded_toplevel;
 };
 #endif

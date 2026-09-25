@@ -149,6 +149,9 @@ struct shady_toplevel {
 	struct wl_listener request_fullscreen;
 	/* Core 3D transform. Z is spatial state, not physics state. */
 	struct { float z; } transform;
+	/* FPS presentation: folded windows use a compact cube body; F3 expands
+	 * exactly one focused window for normal client interaction. */
+	bool fps_expanded;
 	struct shady_window_motion_state motion;
 	struct shady_window_physics_state physics;
 	struct shady_close_animation_state close;
