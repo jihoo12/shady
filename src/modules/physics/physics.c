@@ -120,7 +120,14 @@ void shady_physics_update(struct shady_server *server,float dt,float logical_w,f
 		float floor_center=support_y+half_h;
 		if(supported){
 			float impact=-t->physics.vy;center_y=floor_center;
-			if(impact>.12f){t->physics.vy=impact*restitution;float side=sinf(tilt_y)>=0.f?1.f:-1.f;shady_window_motion_add_impulse(server,t,side*impact*.018f,impact*.035f,side*impact*angular_kick,-sinf(tilt_x)*impact*angular_kick);}
+			if(impact>.12f){
+				t->physics.vy=impact*restitution;
+				/* Folded cubes have no tilt-dependent collision body. Keep the
+				 * landing kick deterministic and let window motion animate it. */
+				float side=t->physics.vx>=0.f?1.f:-1.f;
+				shady_window_motion_add_impulse(server,t,side*impact*.018f,
+					impact*.035f,side*impact*angular_kick,0.f);
+			}
 			else t->physics.vy=0.f;
 			float friction=1.f-friction_rate*dt;if(friction<0.f)friction=0.f;shady_window_motion_apply_damping(t,friction);t->physics.vx*=friction;t->physics.vz*=friction;
 		}
