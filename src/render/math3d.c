@@ -256,9 +256,13 @@ void shady_window_cube_model(float model[16],float x,float y,float z,float size,
 	shady_mat4_translate(t,x,y,z);shady_mat4_rotate_x(rx,tx);shady_mat4_rotate_y(ry,ty);
 	shady_mat4_multiply(r,ry,rx);shady_mat4_scale(s,size,size,size);
 	shady_mat4_multiply(a,t,r);shady_mat4_multiply(model,a,s);
-	model[12]-=.5f*(model[0]+model[4]+model[8]);
-	model[13]-=.5f*(model[1]+model[5]+model[9]);
-	model[14]-=.5f*(model[2]+model[6]+model[10]);
+	/* Window geometry spans x/y=[0,1] and z=[-1,0], so its local
+	 * centre is (0.5,0.5,-0.5). Keep that point exactly at (x,y,z).
+	 * The old +0.5 Z assumption displaced the visible cube from its
+	 * authoritative physics AABB by roughly one cube depth. */
+	model[12]+=-.5f*model[0]-.5f*model[4]+.5f*model[8];
+	model[13]+=-.5f*model[1]-.5f*model[5]+.5f*model[9];
+	model[14]+=-.5f*model[2]-.5f*model[6]+.5f*model[10];
 }
 
 void shady_window_model(float model[16],
