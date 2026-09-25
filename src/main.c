@@ -23,7 +23,6 @@
 #include "shady.h"
 #include "render/render.h"
 #include "modules/physics/physics.h"
-#include "modules/environment/environment.h"
 
 static void default_config_path(char *buf, size_t size) {
 	const char *xdg = getenv("XDG_CONFIG_HOME");
@@ -72,9 +71,6 @@ int main(int argc, char *argv[]) {
 	}
 	shady_config_load(&server.config, config_path);
 	server.world = shady_world_default();
-	if (!shady_environment_load_world(&server)) {
-		wlr_log(WLR_ERROR, "failed to load environment world collision");
-	}
 	shady_physics_init(&server);
 	server.wl_display = wl_display_create();
 	if (!server.wl_display) {

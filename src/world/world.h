@@ -19,8 +19,9 @@ static inline bool shady_world_add_collider(struct shady_world *world,
 	return true;
 }
 
-/* Build the current static world. OBJ/environment objects can register their
- * colliders here later without teaching physics about individual objects. */
+/* Build the current static world. Environment collision should register
+ * authored/coarse colliders here; visual mesh bounds are intentionally not
+ * treated as solid geometry because their empty volume causes trapping. */
 static inline struct shady_world shady_world_default(void) {
 	struct shady_world world = {0};
 	struct shady_floor floor = shady_world_floor();
