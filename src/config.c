@@ -20,6 +20,8 @@ void shady_config_defaults(struct shady_config *c) {
 		.fps_mode = true,
 		.sky = false,
 		.sky_path = "",
+		.environment_obj = false,
+		.environment_obj_path = "",
 		.bind_quit = { XKB_KEY_Escape, 0 },
 		.bind_cycle_windows = { XKB_KEY_F1, 0 },
 		.bind_close_window = { XKB_KEY_F11, WLR_MODIFIER_ALT },
@@ -96,6 +98,7 @@ bool shady_config_load(struct shady_config *c, const char *path) {
 		*eq='\0'; char *key=trim(p), *value=trim(eq+1);
 		char *comment=strpbrk(value,"#;");
 		if (!strcmp(key,"sky_path")) { if (comment) *comment='\0'; value=trim(value); snprintf(c->sky_path,sizeof(c->sky_path),"%s",value); continue; }
+		if (!strcmp(key,"environment_obj_path")) { if (comment) *comment='\0'; value=trim(value); snprintf(c->environment_obj_path,sizeof(c->environment_obj_path),"%s",value); continue; }
 		if (comment) { *comment='\0'; value=trim(value); }
 #define BIND(name, field) if (!strcmp(key, "bind." name)) { \
 			if (!parse_keybind(value, &c->field)) wlr_log(WLR_ERROR, "config:%u: invalid keybind '%s'", lineno, value); \
@@ -130,6 +133,7 @@ bool shady_config_load(struct shady_config *c, const char *path) {
 		KEY("close_animation",close_animation)
 		KEY("fps_mode",fps_mode)
 		KEY("sky",sky)
+		KEY("environment_obj",environment_obj)
 #undef KEY
 		wlr_log(WLR_ERROR,"config:%u: unknown key '%s'",lineno,key);
 	}

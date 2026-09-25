@@ -528,6 +528,7 @@ void shady_render_output_frame(
 	 * perspective and per-window Z separation.
 	 */
 	shady_scene_effects_draw_floor(server, &pipeline, vp);
+	shady_environment_draw_mesh(server, vp);
 
 	double ox = 0;
 	double oy = 0;
