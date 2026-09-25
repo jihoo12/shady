@@ -12,6 +12,7 @@
 #include "shady.h"
 #include "render/render.h"
 #include "modules/fps/fps.h"
+#include "modules/lua/lua.h"
 
 void focus_toplevel(struct shady_toplevel *toplevel) {
 	if (toplevel == NULL) {
@@ -93,6 +94,7 @@ static void xdg_toplevel_map(struct wl_listener *listener, void *data) {
 	wl_list_insert(&toplevel->server->toplevels, &toplevel->link);
 
 	focus_toplevel(toplevel);
+	shady_lua_emit(toplevel->server, "window_map", toplevel);
 }
 
 static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
@@ -107,6 +109,7 @@ static void xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
 	 * unmap/destroy itself (for example after typing "exit") while it is held.
 	 * Clear it before renderer/physics can observe the stale object.
 	 */
+	shady_lua_emit(toplevel->server, "window_unmap", toplevel);
 	shady_fps_toplevel_gone(toplevel->server, toplevel);
 	shady_render_toplevel_unmap(
 		toplevel
