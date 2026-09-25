@@ -6,6 +6,7 @@
 #include <lualib.h>
 #include <wlr/util/log.h>
 #include "../../shady.h"
+#include "../../render/render.h"
 #include "../physics/physics.h"
 #include "../fps/fps.h"
 #include <string.h>
