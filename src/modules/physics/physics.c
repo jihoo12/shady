@@ -11,6 +11,19 @@
 #include "../../world/world.h"
 #define WINDOW_GRAVITY 2.8f
 
+static bool triangle_cube_overlap(const struct shady_triangle_collider*t,const float c[3],const float h[3]){
+	/* Conservative narrow phase: triangle AABB against the dynamic cube.
+	 * Unlike the old group AABB this preserves per-face locality and is a
+	 * useful stepping stone to exact triangle/SAT contacts. */
+	for(int a=0;a<3;a++)if(t->max[a]<c[a]-h[a]||t->min[a]>c[a]+h[a])return false;
+	return true;
+}
+
+static bool world_has_triangle_contact(const struct shady_world*w,const float c[3],const float h[3]){
+	for(size_t i=0;i<w->triangle_count;i++)if(triangle_cube_overlap(&w->triangles[i],c,h))return true;
+	return false;
+}
+
 /* Sweep one cube axis against every world AABB. The other two axes must
  * overlap, so each of the cube's six faces is an equally valid contact face. */
 static bool sweep_cube_axis(const struct shady_world *world,float center[3],
@@ -26,10 +39,16 @@ static bool sweep_cube_axis(const struct shady_world *world,float center[3],
 		if(center[a]+half[a]<=mn[a]||center[a]-half[a]>=mx[a]||
 		   center[b]+half[b]<=mn[b]||center[b]-half[b]>=mx[b])continue;
 		if(delta>0.f&&start+half[axis]<=mn[axis]&&next+half[axis]>=mn[axis]){
-			float candidate=mn[axis]-half[axis];
+			float candidate=mn[axis]-half[axis],probe[3]={center[0],center[1],center[2]};
+			probe[axis]=candidate;
+			/* collider 0 is Shady's built-in floor. Authored OBJ boxes are only
+			 * broad phase now: accept them only where collision triangles exist. */
+			if(i>0&&world->triangle_count&&!world_has_triangle_contact(world,probe,half))continue;
 			if(!hit||candidate<best){best=candidate;hit=true;}
 		}else if(delta<0.f&&start-half[axis]>=mx[axis]&&next-half[axis]<=mx[axis]){
-			float candidate=mx[axis]+half[axis];
+			float candidate=mx[axis]+half[axis],probe[3]={center[0],center[1],center[2]};
+			probe[axis]=candidate;
+			if(i>0&&world->triangle_count&&!world_has_triangle_contact(world,probe,half))continue;
 			if(!hit||candidate>best){best=candidate;hit=true;}
 		}
 	}
