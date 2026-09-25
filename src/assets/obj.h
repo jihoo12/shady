@@ -15,4 +15,9 @@ bool shady_obj_load(const char *path, struct shady_mesh *mesh);
 bool shady_obj_load_colliders(const char *path,
 	struct shady_box_collider *colliders, size_t capacity, size_t *count);
 
+/* Extract triangulated faces from collision_* groups. These are the authored
+ * narrow-phase geometry; group AABBs remain useful as coarse bounds/debug. */
+bool shady_obj_load_collision_triangles(const char *path,
+	struct shady_triangle_collider *triangles, size_t capacity, size_t *count);
+
 #endif
