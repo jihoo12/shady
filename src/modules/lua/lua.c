@@ -7,6 +7,16 @@
 #include <wlr/util/log.h>
 #include "../../shady.h"
 
+static struct shady_server *lua_server;
+static int l_shady_config(lua_State *L){
+	const char *key=luaL_checkstring(L,1),*value;
+	char boolean[6];
+	if(lua_isboolean(L,2)){snprintf(boolean,sizeof(boolean),"%s",lua_toboolean(L,2)?"true":"false");value=boolean;}
+	else value=luaL_checkstring(L,2);
+	if(!shady_config_set(&lua_server->config,key,value))
+		return luaL_error(L,"invalid Shady config: %s = %s",key,value);
+	return 0;
+}
 static int l_shady_log(lua_State *L){
 	const char *message=luaL_checkstring(L,1);
 	wlr_log(WLR_INFO,"[SHADY LUA] 🌙 %s",message);
@@ -15,9 +25,11 @@ static int l_shady_log(lua_State *L){
 static void install_api(lua_State *L){
 	lua_newtable(L);
 	lua_pushcfunction(L,l_shady_log);lua_setfield(L,-2,"log");
+	lua_pushcfunction(L,l_shady_config);lua_setfield(L,-2,"config");
 	lua_setglobal(L,"shady");
 }
 static void default_script_path(char *buf,size_t size){
+	const char *override=getenv("SHADY_LUA_INIT");if(override&&*override){snprintf(buf,size,"%s",override);return;}
 	const char *xdg=getenv("XDG_CONFIG_HOME"),*home=getenv("HOME");
 	if(xdg&&*xdg)snprintf(buf,size,"%s/shady/init.lua",xdg);
 	else if(home&&*home)snprintf(buf,size,"%s/.config/shady/init.lua",home);
@@ -25,7 +37,7 @@ static void default_script_path(char *buf,size_t size){
 }
 bool shady_lua_init(struct shady_server *server){
 	lua_State *L=luaL_newstate();if(!L){wlr_log(WLR_ERROR,"[SHADY LUA] failed to create Lua state");return false;}
-	server->lua.L=L;luaL_openlibs(L);install_api(L);
+	server->lua.L=L;lua_server=server;luaL_openlibs(L);install_api(L);
 	char path[4096];default_script_path(path,sizeof(path));
 	if(luaL_loadfile(L,path)!=LUA_OK){
 		const char *e=lua_tostring(L,-1);
