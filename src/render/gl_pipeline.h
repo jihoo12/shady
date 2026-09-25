@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include "../world/floor.h"
 #include "../world/collider.h"
+#include "../world/world.h"
 
 struct wlr_renderer;
 
@@ -134,6 +135,10 @@ void shady_gl_pipeline_draw_debug_window_body(
 void shady_gl_pipeline_draw_debug_box(
 	struct shady_gl_pipeline *pipeline, const float vp[16],
 	const struct shady_box_collider *box, bool environment
+);
+void shady_gl_pipeline_draw_debug_triangle(
+	struct shady_gl_pipeline *pipeline, const float vp[16],
+	const struct shady_triangle_collider *triangle
 );
 
 bool shady_gl_pipeline_copy_texture(
