@@ -10,21 +10,26 @@
 #include "../fps/fps.h"
 #include <string.h>
 #include <wlr/types/wlr_keyboard.h>
+#include <wlr/types/wlr_xdg_shell.h>
 
 static struct shady_server *lua_server;
 #define SHADY_LUA_MAX_BINDS 32
 struct lua_bind { xkb_keysym_t sym; uint32_t modifiers; int ref; };
 static struct lua_bind lua_binds[SHADY_LUA_MAX_BINDS]; static size_t lua_bind_count;
 
-static uint32_t parse_mod(const char *s){
-	if(!strcmp(s,"Alt"))return WLR_MODIFIER_ALT;if(!strcmp(s,"Shift"))return WLR_MODIFIER_SHIFT;
-	if(!strcmp(s,"Ctrl")||!strcmp(s,"Control"))return WLR_MODIFIER_CTRL;
-	if(!strcmp(s,"Super")||!strcmp(s,"Logo"))return WLR_MODIFIER_LOGO;return 0;
+static uint32_t parse_mod(const char *s) {
+	if (!strcmp(s, "Alt")) return WLR_MODIFIER_ALT;
+	if (!strcmp(s, "Shift")) return WLR_MODIFIER_SHIFT;
+	if (!strcmp(s, "Ctrl") || !strcmp(s, "Control")) return WLR_MODIFIER_CTRL;
+	if (!strcmp(s, "Super") || !strcmp(s, "Logo")) return WLR_MODIFIER_LOGO;
+	return 0;
 }
 static bool parse_lua_bind(const char *spec,xkb_keysym_t *sym,uint32_t *mods){
 	char buf[128];if(strlen(spec)>=sizeof(buf))return false;strcpy(buf,spec);*mods=0;char *save=NULL,*tok=strtok_r(buf,"+",&save),*key=NULL;
 	while(tok){uint32_t m=parse_mod(tok);if(m)*mods|=m;else{if(key)return false;key=tok;}tok=strtok_r(NULL,"+",&save);}
-	if(!key)return false;*sym=xkb_keysym_from_name(key,XKB_KEYSYM_CASE_INSENSITIVE);return *sym!=XKB_KEY_NoSymbol;
+	if (!key) return false;
+	*sym = xkb_keysym_from_name(key, XKB_KEYSYM_CASE_INSENSITIVE);
+	return *sym != XKB_KEY_NoSymbol;
 }
 static int l_shady_bind(lua_State *L){
 	const char *spec=luaL_checkstring(L,1);luaL_checktype(L,2,LUA_TFUNCTION);
@@ -36,7 +41,8 @@ static int l_shady_camera(lua_State *L){
 	const char *key=luaL_checkstring(L,1);float v=(float)luaL_checknumber(L,2);struct shady_camera *c=&lua_server->camera;
 	if(!strcmp(key,"yaw"))c->yaw=v;else if(!strcmp(key,"pitch"))c->pitch=v;else if(!strcmp(key,"distance"))c->distance=v;
 	else if(!strcmp(key,"target_x"))c->target_x=v;else if(!strcmp(key,"target_y"))c->target_y=v;else if(!strcmp(key,"target_z"))c->target_z=v;
-	else return luaL_error(L,"unknown camera property: %s",key);return 0;
+	else return luaL_error(L, "unknown camera property: %s", key);
+	return 0;
 }
 static int l_shady_quit(lua_State *L){(void)L;if(lua_server->wl_display)wl_display_terminate(lua_server->wl_display);return 0;}
 static int l_shady_toggle_gravity(lua_State *L){(void)L;shady_physics_toggle_gravity(lua_server);return 0;}
