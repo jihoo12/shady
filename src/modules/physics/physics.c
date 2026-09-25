@@ -57,6 +57,22 @@ static bool sweep_cube_axis(const struct shady_world *world,float center[3],
 	return hit;
 }
 
+void shady_physics_move_cube(const struct shady_world*world,float center[3],
+		const float target[3],float half_size){
+	float delta[3]={target[0]-center[0],target[1]-center[1],target[2]-center[2]};
+	float max_move=fmaxf(fabsf(delta[0]),fmaxf(fabsf(delta[1]),fabsf(delta[2])));
+	float max_step=half_size*.5f;
+	int steps=(int)ceilf(max_move/max_step);if(steps<1)steps=1;if(steps>64)steps=64;
+	float step[3]={delta[0]/steps,delta[1]/steps,delta[2]/steps};
+	const float half[3]={half_size,half_size,half_size};
+	float velocity=0.f;
+	for(int i=0;i<steps;i++){
+		sweep_cube_axis(world,center,half,1,step[1],&velocity,0.f);
+		sweep_cube_axis(world,center,half,0,step[0],&velocity,0.f);
+		sweep_cube_axis(world,center,half,2,step[2],&velocity,0.f);
+	}
+}
+
 bool shady_physics_window_body(const struct shady_toplevel *t,float logical_w,float logical_h,struct shady_window_body *body){
 	if(!t||!body||logical_h<=0.f)return false;
 	struct wlr_surface*s=t->xdg_toplevel->base->surface;
