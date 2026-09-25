@@ -70,8 +70,10 @@ struct shady_toplevel *shady_toplevel_at_3d(struct shady_server *server,
 		float layout_y = (float)(toplevel->scene_tree->node.y + oy);
 
 		float model[16];
-		shady_window_model(model, layout_x, layout_y, tw, th,
-			logical_w, logical_h, toplevel->transform.z, toplevel->motion.tilt_x, toplevel->motion.tilt_y);
+		if(server->camera.first_person&&!toplevel->fps_expanded){
+			float cx=(layout_x+tw*.5f-logical_w*.5f)/logical_h,cy=.5f-(layout_y+th*.5f)/logical_h;
+			shady_window_cube_model(model,cx,cy,toplevel->transform.z,.16f,toplevel->motion.tilt_x,toplevel->motion.tilt_y);
+		}else shady_window_model(model,layout_x,layout_y,tw,th,logical_w,logical_h,toplevel->transform.z,toplevel->motion.tilt_x,toplevel->motion.tilt_y);
 
 		float t, u, v;
 		bool front_hit = false;
@@ -144,11 +146,11 @@ struct shady_toplevel *shady_toplevel_at_camera_center_hit(
 		float th = (float)surf->current.height;
 		if (tw <= 0.f || th <= 0.f) continue;
 		float model[16];
-		shady_window_model(model,
-			(float)(toplevel->scene_tree->node.x + ox),
-			(float)(toplevel->scene_tree->node.y + oy),
-			tw, th, logical_w, logical_h, toplevel->transform.z,
-			toplevel->motion.tilt_x, toplevel->motion.tilt_y);
+		if(server->camera.first_person&&!toplevel->fps_expanded){
+			float lx=(float)(toplevel->scene_tree->node.x+ox),ly=(float)(toplevel->scene_tree->node.y+oy);
+			float cx=(lx+tw*.5f-logical_w*.5f)/logical_h,cy=.5f-(ly+th*.5f)/logical_h;
+			shady_window_cube_model(model,cx,cy,toplevel->transform.z,.16f,toplevel->motion.tilt_x,toplevel->motion.tilt_y);
+		}else shady_window_model(model,(float)(toplevel->scene_tree->node.x+ox),(float)(toplevel->scene_tree->node.y+oy),tw,th,logical_w,logical_h,toplevel->transform.z,toplevel->motion.tilt_x,toplevel->motion.tilt_y);
 		float t, u, v;
 		bool front_hit = false;
 		if (shady_ray_window_shell_hit(&ray, model, toplevel->motion.wobble_x,
