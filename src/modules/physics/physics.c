@@ -24,7 +24,9 @@ bool shady_physics_window_body(const struct shady_toplevel *t,float logical_w,fl
 	body->half[0]=fabsf(cosf(ty))*ww*.5f;
 	body->half[1]=fabsf(cx)*wh*.5f+fabsf(sx*sy)*ww*.5f;
 	body->half[2]=fabsf(sy)*ww*.5f+fabsf(sx)*wh*.5f;
-	if(body->half[0]<.006f)body->half[0]=.006f;if(body->half[1]<.012f)body->half[1]=.012f;if(body->half[2]<.006f)body->half[2]=.006f;
+	if(body->half[0]<.006f) body->half[0]=.006f;
+	if(body->half[1]<.012f) body->half[1]=.012f;
+	if(body->half[2]<.006f) body->half[2]=.006f;
 	return true;
 }
 
